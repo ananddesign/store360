@@ -35,14 +35,3 @@ next-env.d.ts
 
 # local Claude settings
 .claude/settings.local.json
-
-# Local 360 / product image assets — NOT committed.
-# The app runs on procedural placeholders by design; drop your own
-# equirectangular panoramas / product photos into these folders locally.
-# (Kept out of the public repo to avoid publishing personal test photos.)
-/public/vr/panoramas/*
-!/public/vr/panoramas/README.txt
-/public/vr/products/*
-!/public/vr/products/README.txt
-/public/vr/icons/*
-!/public/vr/icons/README.txt
