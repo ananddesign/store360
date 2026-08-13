@@ -6,14 +6,14 @@ import type { VRScene } from '@/types/vr';
  * Scenes are pure data — add, remove or reorder them here without touching any
  * rendering code. Each `environment.source` is either a real equirectangular
  * image path or a "placeholder://<themeKey>" descriptor (see lib/vr/placeholder.ts).
- * To ship real photography, drop a 2:1 JPEG in /public/vr/panoramas/ and set
+ * To ship real photography, drop a 2:1 image in /public/vr/panoramas/ and set
  * `source: '/vr/panoramas/entrance.jpg'`.
  *
  * Hotspot positioning is documented in docs/HOTSPOTS.md.
  *
- * NOTE: These 8 zones are placeholders — not the final QWEEN store layout.
- * The first three (entrance → lobby → main-showroom) form the §31 prototype
- * flow and are the ones fully wired with hotspots.
+ * Current flow: Entrance → Lobby → Main Showroom, all on real 360° photos.
+ * (Empty placeholder-only zones were removed; add new zones here as their
+ * photography arrives.)
  */
 export const scenes: VRScene[] = [
   {
@@ -53,13 +53,6 @@ export const scenes: VRScene[] = [
         position: { x: -0.5, y: -0.1, z: -4 },
       },
       {
-        id: 'lobby-to-consultation',
-        type: 'navigation',
-        label: 'Consultation',
-        targetSceneId: 'consultation',
-        position: { x: 3.8, y: 0, z: -1.5 },
-      },
-      {
         id: 'lobby-back-entrance',
         type: 'navigation',
         label: 'Entrance',
@@ -79,29 +72,8 @@ export const scenes: VRScene[] = [
     name: 'Main Showroom',
     environment: { type: 'panorama', source: '/vr/panoramas/main-showroom.png' },
     initialCamera: { yaw: 0, pitch: 0 },
-    preload: ['diamond-bar', 'bridal', 'lobby'],
+    preload: ['lobby'],
     hotspots: [
-      {
-        id: 'showroom-to-diamond-bar',
-        type: 'navigation',
-        label: 'Diamond Bar',
-        targetSceneId: 'diamond-bar',
-        position: { x: 3.6, y: 0, z: -2 },
-      },
-      {
-        id: 'showroom-to-bridal',
-        type: 'navigation',
-        label: 'Bridal',
-        targetSceneId: 'bridal',
-        position: { x: -3.6, y: 0, z: -2 },
-      },
-      {
-        id: 'showroom-to-high-jewellery',
-        type: 'navigation',
-        label: 'High Jewellery',
-        targetSceneId: 'high-jewellery',
-        position: { x: 0, y: 0.1, z: -4 },
-      },
       {
         id: 'showroom-back-lobby',
         type: 'navigation',
@@ -109,129 +81,34 @@ export const scenes: VRScene[] = [
         targetSceneId: 'lobby',
         position: { x: 0, y: -0.2, z: 4 },
       },
+      // Product hotspots placed on the jewellery visible in the photo.
+      // (Tune positions with /vr?scene=main-showroom&debug=true.)
       {
-        id: 'showroom-eternity',
-        type: 'product',
-        productId: 'qween-eternity-003',
-        position: { x: 1.8, y: 0.5, z: -3.2 },
-      },
-      {
-        id: 'showroom-drops',
-        type: 'product',
-        productId: 'qween-drop-004',
-        position: { x: -1.8, y: 0.5, z: -3.2 },
-      },
-    ],
-  },
-  {
-    id: 'diamond-bar',
-    name: 'Diamond Bar',
-    environment: { type: 'panorama', source: 'placeholder://diamond-bar' },
-    preload: ['main-showroom'],
-    hotspots: [
-      {
-        id: 'diamond-bar-back',
-        type: 'navigation',
-        label: 'Main Showroom',
-        targetSceneId: 'main-showroom',
-        position: { x: 0, y: -0.2, z: 4 },
-      },
-      {
-        id: 'diamond-bar-solitaire',
+        // Foreground round glass display case.
+        id: 'showroom-case-solitaire',
         type: 'product',
         productId: 'qween-solitaire-001',
-        position: { x: 2, y: 0.3, z: -3 },
-      },
-    ],
-  },
-  {
-    id: 'bridal',
-    name: 'Bridal',
-    environment: { type: 'panorama', source: 'placeholder://bridal' },
-    preload: ['main-showroom'],
-    hotspots: [
-      {
-        id: 'bridal-back',
-        type: 'navigation',
-        label: 'Main Showroom',
-        targetSceneId: 'main-showroom',
-        position: { x: 0, y: -0.2, z: 4 },
+        position: { x: -0.5, y: -1.2, z: -2.1 },
       },
       {
-        id: 'bridal-eternity',
-        type: 'product',
-        productId: 'qween-eternity-003',
-        position: { x: -2.2, y: 0.3, z: -2.8 },
-      },
-    ],
-  },
-  {
-    id: 'high-jewellery',
-    name: 'High Jewellery',
-    environment: { type: 'panorama', source: 'placeholder://high-jewellery' },
-    preload: ['main-showroom', 'private-lounge'],
-    hotspots: [
-      {
-        id: 'high-jewellery-back',
-        type: 'navigation',
-        label: 'Main Showroom',
-        targetSceneId: 'main-showroom',
-        position: { x: 0, y: -0.2, z: 4 },
-      },
-      {
-        id: 'high-jewellery-to-lounge',
-        type: 'navigation',
-        label: 'Private Lounge',
-        targetSceneId: 'private-lounge',
-        position: { x: 3.6, y: 0, z: -2 },
-      },
-      {
-        id: 'high-jewellery-riviere',
+        // Blue-tiled wall display case with necklaces (left).
+        id: 'showroom-wall-riviere',
         type: 'product',
         productId: 'qween-riviere-002',
-        position: { x: 0, y: 0.4, z: -3.4 },
-      },
-    ],
-  },
-  {
-    id: 'consultation',
-    name: 'Consultation',
-    environment: { type: 'panorama', source: 'placeholder://consultation' },
-    preload: ['lobby'],
-    hotspots: [
-      {
-        id: 'consultation-back',
-        type: 'navigation',
-        label: 'Lobby',
-        targetSceneId: 'lobby',
-        position: { x: 0, y: -0.2, z: 4 },
-      },
-    ],
-  },
-  {
-    id: 'private-lounge',
-    name: 'Private Lounge',
-    environment: { type: 'panorama', source: 'placeholder://private-lounge' },
-    preload: ['high-jewellery'],
-    hotspots: [
-      {
-        id: 'private-lounge-back',
-        type: 'navigation',
-        label: 'High Jewellery',
-        targetSceneId: 'high-jewellery',
-        position: { x: 0, y: -0.2, z: 4 },
+        position: { x: -1.2, y: -0.2, z: -3.0 },
       },
       {
-        id: 'private-lounge-drops',
+        // Right-hand counter / arched display.
+        id: 'showroom-counter-eternity',
         type: 'product',
-        productId: 'qween-drop-004',
-        position: { x: 2.4, y: 0.4, z: -2.8 },
+        productId: 'qween-eternity-003',
+        position: { x: 0.95, y: -0.55, z: -3.0 },
       },
     ],
   },
 ];
 
-/** The scene shown first when no `?scene=` deep-link is provided. */
+/** The scene shown first when no `?scene=` deep-link is provided. Also "home". */
 export const DEFAULT_SCENE_ID = 'entrance';
 
 const sceneIndex = new Map(scenes.map((s) => [s.id, s]));

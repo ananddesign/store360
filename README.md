@@ -87,7 +87,7 @@ lib/
     config.ts           Tuning constants (height, radius, timings…)
 
 data/
-  scenes.ts             8 zones (entrance…private-lounge)
+  scenes.ts             Scene graph (entrance → lobby → main-showroom)
   products.ts           Placeholder catalogue
 
 types/
