@@ -19,7 +19,7 @@ export const scenes: VRScene[] = [
   {
     id: 'entrance',
     name: 'Entrance',
-    environment: { type: 'panorama', source: 'placeholder://entrance' },
+    environment: { type: 'panorama', source: '/vr/panoramas/entrance.jpg' },
     initialCamera: { yaw: 0, pitch: 0 },
     preload: ['lobby'],
     hotspots: [
@@ -41,7 +41,7 @@ export const scenes: VRScene[] = [
   {
     id: 'lobby',
     name: 'Lobby',
-    environment: { type: 'panorama', source: 'placeholder://lobby' },
+    environment: { type: 'panorama', source: '/vr/panoramas/lobby.jpg' },
     initialCamera: { yaw: 0, pitch: 0 },
     preload: ['main-showroom', 'entrance'],
     hotspots: [
@@ -77,7 +77,7 @@ export const scenes: VRScene[] = [
   {
     id: 'main-showroom',
     name: 'Main Showroom',
-    environment: { type: 'panorama', source: 'placeholder://main-showroom' },
+    environment: { type: 'panorama', source: '/vr/panoramas/main-showroom.png' },
     initialCamera: { yaw: 0, pitch: 0 },
     preload: ['diamond-bar', 'bridal', 'lobby'],
     hotspots: [
