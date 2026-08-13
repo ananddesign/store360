@@ -1,0 +1,48 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# certificates (next dev --experimental-https)
+/certificates
+
+# local Claude settings
+.claude/settings.local.json
+
+# Local 360 / product image assets — NOT committed.
+# The app runs on procedural placeholders by design; drop your own
+# equirectangular panoramas / product photos into these folders locally.
+# (Kept out of the public repo to avoid publishing personal test photos.)
+/public/vr/panoramas/*
+!/public/vr/panoramas/README.txt
+/public/vr/products/*
+!/public/vr/products/README.txt
+/public/vr/icons/*
+!/public/vr/icons/README.txt
