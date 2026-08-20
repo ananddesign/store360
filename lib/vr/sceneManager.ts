@@ -195,6 +195,14 @@ export class SceneManager {
     this.busy = false;
   }
 
+  /**
+   * Debug: live-resize the panorama sphere by scaling the existing mesh
+   * (no geometry rebuild, no texture reload, no scene disruption).
+   */
+  setRadius(radius: number): void {
+    this.panorama.scale.setScalar(radius / VR_CONFIG.panoramaRadius);
+  }
+
   dispose(): void {
     this.panorama.geometry.dispose();
     (this.panorama.material as THREE.MeshBasicMaterial).dispose();

@@ -6,7 +6,7 @@ import { TextureManager } from './textureManager';
 import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
-import { VR_CONFIG, DEG2RAD } from './config';
+import { VR_CONFIG, DEG2RAD, DEBUG_VIEW_DEFAULTS } from './config';
 
 export interface DebugInfo {
   sceneId: string | null;
@@ -17,6 +17,15 @@ export interface DebugInfo {
   loadedTextures: string[];
   hotspotIds: string[];
   hovered: string | null;
+}
+
+/** Current values of the live-tunable "View Controls" debug panel (§ViewControlsPanel). */
+export interface ViewTuning {
+  eyeHeight: number;
+  pitchLimitDeg: number;
+  panoramaRadius: number;
+  initialPitchDeg: number;
+  initialYawDeg: number;
 }
 
 export interface EngineCallbacks {
@@ -47,6 +56,10 @@ export class VRSceneEngine {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
+  /** Carries the camera + controllers as a unit; only its Y offset is ever
+   *  touched (eye height, §ViewControlsPanel). Never rotated — the headset's
+   *  own tracked quaternion is always authoritative for orientation. */
+  private rig = new THREE.Group();
   private raycaster = new THREE.Raycaster();
 
   private textures = new TextureManager();
@@ -57,6 +70,12 @@ export class VRSceneEngine {
   // Desktop look state.
   private yaw = 0;
   private pitch = 0;
+
+  // Live-tunable view settings (debug panel). Defaults mirror VR_CONFIG's
+  // production values; setDebug(true) reseeds them from DEBUG_VIEW_DEFAULTS.
+  private pitchLimitDeg: number = VR_CONFIG.maxPitchDeg;
+  private eyeHeightMeters: number = VR_CONFIG.playerHeight;
+  private panoramaRadiusUnits: number = VR_CONFIG.panoramaRadius;
   private dragging = false;
   private pointerDown = new THREE.Vector2();
   private lastPointer = new THREE.Vector2();
@@ -104,7 +123,9 @@ export class VRSceneEngine {
       1000,
     );
     this.camera.position.set(0, 0, 0);
-    this.scene.add(this.camera);
+    this.rig.name = 'player-rig';
+    this.rig.add(this.camera);
+    this.scene.add(this.rig);
 
     // --- Managers ---
     this.hotspots = new HotspotManager(this.textures, (h) => this.resolveHotspotLabel(h));
@@ -196,9 +217,68 @@ export class VRSceneEngine {
     if (on && this.sceneManager.currentScene) {
       this.rebuildDebugGizmos(this.sceneManager.currentScene);
     }
-    // Push an immediate snapshot so the overlay populates without waiting for
-    // the throttled loop tick (also helps when the tab is backgrounded).
-    if (on) this.cb.onDebugUpdate?.(this.getDebugInfo());
+    if (on) {
+      // Seed the View Controls panel's own baseline (independent of the
+      // shipped VR_CONFIG defaults) so a tuning session starts from a known,
+      // documented state rather than whatever's currently in production.
+      this.setPitchLimit(DEBUG_VIEW_DEFAULTS.pitchLimitDeg);
+      this.setPanoramaRadius(DEBUG_VIEW_DEFAULTS.panoramaRadius);
+      this.setEyeHeight(DEBUG_VIEW_DEFAULTS.eyeHeight);
+      // Push an immediate snapshot so the overlay populates without waiting
+      // for the throttled loop tick (also helps when the tab is backgrounded).
+      this.cb.onDebugUpdate?.(this.getDebugInfo());
+    }
+  }
+
+  /* ---------------------------- view tuning (debug) ----------------------- */
+
+  /**
+   * Live eye-height offset (m). Moves the camera + controller rig's Y
+   * position only — the headset's own tracked quaternion (or position) is
+   * never touched, so this never fights natural headset tracking.
+   */
+  setEyeHeight(meters: number): void {
+    this.eyeHeightMeters = meters;
+    this.rig.position.y = meters - VR_CONFIG.playerHeight;
+  }
+
+  /**
+   * Max look-up/down angle (deg) for desktop drag/keyboard look. Re-clamps
+   * the current pitch immediately if it now exceeds a tighter limit. Has no
+   * effect on an active WebXR session — the headset's tracked orientation is
+   * never clamped (§ safety requirement: don't fight headset tracking).
+   */
+  setPitchLimit(deg: number): void {
+    this.pitchLimitDeg = deg;
+    this.pitch = THREE.MathUtils.clamp(this.pitch, -deg, deg);
+  }
+
+  /** Live-resize the panorama sphere (units) without reloading the scene. */
+  setPanoramaRadius(units: number): void {
+    this.panoramaRadiusUnits = units;
+    this.sceneManager.setRadius(units);
+  }
+
+  /**
+   * Snap the current desktop look direction to an explicit yaw/pitch (deg).
+   * Only meaningful on desktop: while presenting in VR, `applyDesktopLook()`
+   * is skipped every frame (see frame()), so this has no visible effect on
+   * the headset — it never overrides the Quest's own tracked quaternion.
+   */
+  setLookOrientation(yawDeg: number, pitchDeg: number): void {
+    this.yaw = yawDeg;
+    this.pitch = THREE.MathUtils.clamp(pitchDeg, -this.pitchLimitDeg, this.pitchLimitDeg);
+  }
+
+  /** Current values of the live-tunable view settings, for the debug panel. */
+  getViewTuning(): ViewTuning {
+    return {
+      eyeHeight: this.eyeHeightMeters,
+      pitchLimitDeg: this.pitchLimitDeg,
+      panoramaRadius: this.panoramaRadiusUnits,
+      initialPitchDeg: this.pitch,
+      initialYawDeg: this.yaw,
+    };
   }
 
   /** Request an immersive-vr session (§8). Rejects if unsupported. */
@@ -285,7 +365,7 @@ export class VRSceneEngine {
     // forced camera movement).
     if (this.renderer.xr.isPresenting) return;
     this.yaw = o.yaw;
-    this.pitch = THREE.MathUtils.clamp(o.pitch, -VR_CONFIG.maxPitchDeg, VR_CONFIG.maxPitchDeg);
+    this.pitch = THREE.MathUtils.clamp(o.pitch, -this.pitchLimitDeg, this.pitchLimitDeg);
   }
 
   private updatePointerHover(): void {
@@ -335,8 +415,8 @@ export class VRSceneEngine {
       this.yaw -= dx * VR_CONFIG.dragSensitivity;
       this.pitch = THREE.MathUtils.clamp(
         this.pitch - dy * VR_CONFIG.dragSensitivity,
-        -VR_CONFIG.maxPitchDeg,
-        VR_CONFIG.maxPitchDeg,
+        -this.pitchLimitDeg,
+        this.pitchLimitDeg,
       );
       this.lastPointer.set(e.clientX, e.clientY);
     }
@@ -361,9 +441,9 @@ export class VRSceneEngine {
     if (e.key === 'ArrowLeft') this.yaw += VR_CONFIG.keyboardYawStep;
     else if (e.key === 'ArrowRight') this.yaw -= VR_CONFIG.keyboardYawStep;
     else if (e.key === 'ArrowUp')
-      this.pitch = THREE.MathUtils.clamp(this.pitch + VR_CONFIG.keyboardYawStep, -VR_CONFIG.maxPitchDeg, VR_CONFIG.maxPitchDeg);
+      this.pitch = THREE.MathUtils.clamp(this.pitch + VR_CONFIG.keyboardYawStep, -this.pitchLimitDeg, this.pitchLimitDeg);
     else if (e.key === 'ArrowDown')
-      this.pitch = THREE.MathUtils.clamp(this.pitch - VR_CONFIG.keyboardYawStep, -VR_CONFIG.maxPitchDeg, VR_CONFIG.maxPitchDeg);
+      this.pitch = THREE.MathUtils.clamp(this.pitch - VR_CONFIG.keyboardYawStep, -this.pitchLimitDeg, this.pitchLimitDeg);
     else if (e.key === 'Escape') this.closeProductPanel();
     else if (e.key === 'h' || e.key === 'H') this.goHome();
   };
@@ -399,7 +479,9 @@ export class VRSceneEngine {
       // Squeeze / grip ("pinch") on either controller → go home.
       controller.addEventListener('squeeze', () => this.goHome());
 
-      this.scene.add(controller);
+      // Part of the rig so a debug eye-height offset moves controllers with
+      // the camera as one unit.
+      this.rig.add(controller);
       this.controllers.push(controller);
       this.controllerLines.push(line);
     }

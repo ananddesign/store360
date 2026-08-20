@@ -47,3 +47,29 @@ export const VR_CONFIG = {
 
 /** Degrees → radians. */
 export const DEG2RAD = Math.PI / 180;
+
+/**
+ * Defaults/ranges for the live "View Controls" debug panel
+ * (components/vr/ViewControlsPanel.tsx, shown only via `?debug=true`).
+ *
+ * Deliberately a separate baseline from VR_CONFIG's shipped production
+ * values above — the panel exists to explore settings different from what's
+ * currently baked in, so entering debug mode seeds these values rather than
+ * whatever VR_CONFIG happens to say. Leaving debug mode / a fresh page load
+ * without `?debug=true` is unaffected and keeps the VR_CONFIG production
+ * behaviour untouched.
+ */
+export const DEBUG_VIEW_DEFAULTS = {
+  eyeHeight: 1.6,
+  pitchLimitDeg: 55,
+  panoramaRadius: 50,
+  initialPitchDeg: 0,
+} as const;
+
+export const DEBUG_VIEW_RANGES = {
+  eyeHeight: { min: 1.4, max: 1.9, step: 0.01 },
+  pitchLimitDeg: { min: 30, max: 80, step: 1 },
+  panoramaRadius: { min: 20, max: 100, step: 1 },
+  initialPitchDeg: { min: -20, max: 20, step: 1 },
+  initialYawDeg: { min: -180, max: 180, step: 1 },
+} as const;

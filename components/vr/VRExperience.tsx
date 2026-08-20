@@ -11,6 +11,7 @@ import { LoadingScreen } from './LoadingScreen';
 import { VRControls } from './VRControls';
 import { DebugOverlay } from './DebugOverlay';
 import { PanoramaTester } from './PanoramaTester';
+import { ViewControlsPanel } from './ViewControlsPanel';
 
 /**
  * Top-level VR experience (client component).
@@ -166,6 +167,10 @@ export function VRExperience() {
       )}
 
       {debugEnabled && <DebugOverlay info={debugInfo} />}
+
+      {debugEnabled && !isVRMode && (
+        <ViewControlsPanel engine={engineRef.current} currentSceneId={currentScene} />
+      )}
     </div>
   );
 }

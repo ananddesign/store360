@@ -72,6 +72,7 @@ components/vr/
   VRControls.tsx        Enter-VR / desktop hints / zone label / close / mute
   LoadingScreen.tsx     QWEEN-branded loader
   DebugOverlay.tsx      /vr?debug=true HUD
+  ViewControlsPanel.tsx /vr?debug=true live eye-height/pitch/radius tuning
 
 lib/
   vrStore.ts            Zustand global UI state
@@ -127,7 +128,16 @@ Open <http://localhost:3000> → **Enter QWEEN Store**, or go straight to
 Useful URLs:
 
 - `/vr?scene=<id>` — deep-link directly into a scene (§25), e.g. `?scene=main-store`
-- `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21)
+- `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21), plus a
+  compact **View Controls** panel (bottom left) for live-tuning eye height,
+  the desktop pitch-look limit, panorama sphere radius, and the current look
+  orientation — all applied immediately, no scene reload. Handy for dialing
+  in comfort on an actual Quest before hardcoding values. Reset restores the
+  panel's own defaults; Copy Settings copies the current numbers as a small
+  `{ eyeHeight, pitchLimit, panoramaRadius, initialPitch, initialYaw }`
+  object to paste into `data/scenes.ts` / `lib/vr/config.ts`. Production
+  behaviour (no `?debug=true`) is unaffected — this panel only overrides
+  values within a debug session.
 
 Desktop controls: **drag** to look, **click** a hotspot, **arrow keys** to look,
 **H** to go home, **Esc** to close the product panel. A subtle looping
