@@ -10,6 +10,22 @@ interface ViewControlsPanelProps {
   currentSceneId: string | null;
 }
 
+interface PanoramaOption {
+  name: string;
+  url: string;
+}
+
+/** "dewarp flat.jpg" → "Dewarp Flat". */
+function humanizeFilename(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, '');
+  return stem
+    .replace(/[-_]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0]!.toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 interface Tuning {
   eyeHeight: number;
   pitchLimit: number;
@@ -32,6 +48,9 @@ export function ViewControlsPanel({ engine, currentSceneId }: ViewControlsPanelP
   const sceneYawDefault = currentSceneId
     ? getSceneById(currentSceneId)?.initialCamera?.yaw ?? 0
     : 0;
+  const activePanoramaName = currentSceneId?.startsWith('custom:')
+    ? currentSceneId.slice('custom:'.length)
+    : null;
 
   const [open, setOpen] = useState(true);
   const [tuning, setTuning] = useState<Tuning>(() =>
@@ -46,6 +65,18 @@ export function ViewControlsPanel({ engine, currentSceneId }: ViewControlsPanelP
         },
   );
   const [copied, setCopied] = useState(false);
+  const [panoramas, setPanoramas] = useState<PanoramaOption[]>([]);
+
+  const refreshPanoramas = () => {
+    fetch('/api/panoramas')
+      .then((r) => r.json())
+      .then((d: { images: PanoramaOption[] }) => setPanoramas(d.images ?? []))
+      .catch(() => setPanoramas([]));
+  };
+
+  useEffect(() => {
+    refreshPanoramas();
+  }, []);
 
   // Once the engine becomes available, mirror its (already debug-seeded)
   // eye height / pitch limit / panorama radius.
@@ -129,6 +160,7 @@ export function ViewControlsPanel({ engine, currentSceneId }: ViewControlsPanelP
             />
             <SliderRow
               label="Vertical View / Pitch"
+              hint="Look-up/down limit — doesn't move the view by itself; drag-look to test it"
               value={tuning.pitchLimit}
               range={DEBUG_VIEW_RANGES.pitchLimitDeg}
               unit="°"
@@ -155,6 +187,49 @@ export function ViewControlsPanel({ engine, currentSceneId }: ViewControlsPanelP
               unit="°"
               onChange={(v) => update({ initialYaw: v })}
             />
+
+            {/* Candidate 360° panoramas dropped in public/vr/panoramas — click
+                to preview one live while tuning the settings above. Not part
+                of the scene graph; purely a comparison aid before finalising. */}
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-widest text-qween-mist">
+                  Compare Panoramas
+                </span>
+                <button
+                  onClick={refreshPanoramas}
+                  className="text-[10px] uppercase tracking-wider text-qween-gold-soft hover:text-qween-gold"
+                >
+                  Refresh
+                </button>
+              </div>
+              {panoramas.length === 0 ? (
+                <div className="py-1 text-[11px] text-qween-mist">
+                  No images in /public/vr/panoramas.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {panoramas.map((p) => {
+                    const active = activePanoramaName === p.name;
+                    return (
+                      <button
+                        key={p.url}
+                        onClick={() => engine?.showPanoramaFromURL(p.url, p.name)}
+                        className={`truncate rounded-md px-3 py-1.5 text-left text-[12px] transition ${
+                          active
+                            ? 'bg-qween-gold/20 text-qween-gold-soft'
+                            : 'text-qween-diamond hover:bg-white/5'
+                        }`}
+                        title={p.name}
+                      >
+                        {active ? '● ' : ''}
+                        {humanizeFilename(p.name)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <div className="mt-3 flex gap-2 border-t border-white/10 pt-3">
               <button
@@ -190,6 +265,9 @@ function fromEngine(engine: VRSceneEngine): Tuning {
 
 interface SliderRowProps {
   label: string;
+  /** Optional one-line clarification shown under the label, e.g. to flag a
+   *  control that constrains behaviour rather than directly moving the view. */
+  hint?: string;
   value: number;
   range: { min: number; max: number; step: number };
   unit: string;
@@ -197,7 +275,7 @@ interface SliderRowProps {
   onChange: (value: number) => void;
 }
 
-function SliderRow({ label, value, range, unit, decimals = 0, onChange }: SliderRowProps) {
+function SliderRow({ label, hint, value, range, unit, decimals = 0, onChange }: SliderRowProps) {
   return (
     <div className="mt-3 first:mt-0">
       <div className="mb-1 flex items-center justify-between text-[11px]">
@@ -207,6 +285,7 @@ function SliderRow({ label, value, range, unit, decimals = 0, onChange }: Slider
           {unit}
         </span>
       </div>
+      {hint && <div className="mb-1 text-[10px] italic text-qween-mist">{hint}</div>}
       <input
         type="range"
         min={range.min}

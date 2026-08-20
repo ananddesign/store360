@@ -140,6 +140,17 @@ Useful URLs:
   behaviour (no `?debug=true`) is unaffected — this panel only overrides
   values within a debug session.
 
+  Note that **Vertical View / Pitch** is a *limit*, not a rotation — it caps
+  how far up/down you can look, it doesn't tilt the camera by itself (only
+  **Initial Pitch** / **Initial Yaw** do that, instantly). The panel says so
+  inline, since it's an easy thing to expect wrongly.
+
+  Below Initial Yaw, a **Compare Panoramas** list auto-lists every image
+  currently in `public/vr/panoramas/` (Refresh to pick up new drops) —
+  click one to preview it live via the same ad-hoc loader the `?test=true`
+  tester uses, so you can flip between photography candidates while tuning
+  eye height/pitch on top of whichever one is currently showing.
+
   The URL param isn't the only way in: a **gear icon** top right (below the
   mute button) toggles the same debug HUD + View Controls on/off at any
   time, no URL editing needed — it turns gold while active. Toggling off and
