@@ -128,7 +128,7 @@ Useful URLs:
 - `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21)
 
 Desktop controls: **drag** to look, **click** a hotspot, **arrow keys** to look,
-**Esc** to close the product panel.
+**H** to go home (Entrance), **Esc** to close the product panel.
 
 Other scripts:
 
@@ -171,8 +171,9 @@ Then open `http://localhost:3000/vr` in the Quest Browser.
 
 In-headset: press **Enter VR**, look around naturally, point a controller (a
 subtle gold ray appears), and pull the **trigger** to select navigation or
-product hotspots. There is no forced locomotion — you travel only by selecting
-navigation hotspots (§23).
+product hotspots. **Squeeze the grip ("pinch") on either controller to jump
+back to the home (Entrance) scene** at any time. There is no forced locomotion —
+you travel only by selecting hotspots or the home gesture (§23).
 
 ## 6. How to add a new 360 scene
 

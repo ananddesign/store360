@@ -54,11 +54,6 @@ export class VRSceneEngine {
   private sceneManager: SceneManager;
   private panel: ProductPanel3D;
 
-  // Persistent "Home" button, anchored to the camera (HUD). Works via desktop
-  // click and VR controller trigger/pinch. Hidden on the home scene itself.
-  private homeButton!: THREE.Mesh;
-  private homeHovered = false;
-
   // Desktop look state.
   private yaw = 0;
   private pitch = 0;
@@ -111,11 +106,6 @@ export class VRSceneEngine {
     this.camera.position.set(0, 0, 0);
     this.scene.add(this.camera);
 
-    // --- Home HUD button (child of camera → always bottom-of-view) ---
-    this.homeButton = this.makeHomeButton();
-    this.homeButton.visible = false;
-    this.camera.add(this.homeButton);
-
     // --- Managers ---
     this.hotspots = new HotspotManager(this.textures, (h) => this.resolveHotspotLabel(h));
     this.scene.add(this.hotspots.group);
@@ -135,8 +125,6 @@ export class VRSceneEngine {
         onSceneViewed: (s) => {
           this.cb.onSceneChange?.(s);
           this.cb.onEvent?.('scene_viewed', { sceneId: s.id });
-          // Show the Home button everywhere except the home scene itself.
-          this.homeButton.visible = s.id !== DEFAULT_SCENE_ID;
           if (this.debug) this.rebuildDebugGizmos(s);
         },
         onTransitionStart: (from, to) => {
@@ -175,9 +163,6 @@ export class VRSceneEngine {
     this.sceneManager.dispose();
     this.hotspots.dispose();
     this.panel.dispose();
-    this.homeButton.geometry.dispose();
-    (this.homeButton.material as THREE.MeshBasicMaterial).map?.dispose();
-    (this.homeButton.material as THREE.MeshBasicMaterial).dispose();
     this.textures.disposeAll();
     this.clearDebugGizmos();
     this.renderer.dispose();
@@ -200,9 +185,6 @@ export class VRSceneEngine {
     if (this.panel.isOpen()) {
       const p = this.panel.product();
       this.panel.hide();
-      // Restore the Home button (hidden while the panel was open).
-      this.homeButton.visible =
-        this.sceneManager.currentScene?.id !== DEFAULT_SCENE_ID;
       this.cb.onProductClose?.();
       this.cb.onEvent?.('product_panel_closed', { productId: p?.id });
     }
@@ -383,6 +365,7 @@ export class VRSceneEngine {
     else if (e.key === 'ArrowDown')
       this.pitch = THREE.MathUtils.clamp(this.pitch - VR_CONFIG.keyboardYawStep, -VR_CONFIG.maxPitchDeg, VR_CONFIG.maxPitchDeg);
     else if (e.key === 'Escape') this.closeProductPanel();
+    else if (e.key === 'h' || e.key === 'H') this.goHome();
   };
 
   /* ----------------------------- controllers ---------------------------- */
@@ -413,6 +396,8 @@ export class VRSceneEngine {
         this.setRaycasterFromController(controller);
         this.performSelect();
       });
+      // Squeeze / grip ("pinch") on either controller → go home.
+      controller.addEventListener('squeeze', () => this.goHome());
 
       this.scene.add(controller);
       this.controllers.push(controller);
@@ -467,22 +452,12 @@ export class VRSceneEngine {
       const action = this.panel.raycast(this.raycaster);
       this.panel.setHoveredAction(action);
       this.hotspots.setHovered(null);
-      this.setHomeHovered(false);
       if (action) {
         this.setCursor(true);
         return VR_CONFIG.productPanel.distance;
       }
       // Still allow hotspot hover behind/around the panel.
     }
-
-    // Home HUD button next.
-    if (this.homeButton.visible && this.rayHitsHome()) {
-      this.setHomeHovered(true);
-      this.hotspots.setHovered(null);
-      this.setCursor(true);
-      return 1.2;
-    }
-    this.setHomeHovered(false);
 
     const hit = this.hotspots.raycast(this.raycaster);
     if (hit) {
@@ -508,13 +483,7 @@ export class VRSceneEngine {
       }
     }
 
-    // 2) Home HUD button.
-    if (this.homeButton.visible && this.rayHitsHome()) {
-      this.goHome();
-      return;
-    }
-
-    // 3) Hotspots.
+    // 2) Hotspots.
     const hit = this.hotspots.raycast(this.raycaster);
     if (!hit) return;
     const h = hit.hotspot;
@@ -555,9 +524,6 @@ export class VRSceneEngine {
 
     const { position, lookAt } = this.computePanelPlacement();
     this.panel.show(product, position, lookAt);
-    // Avoid overlap: hide the Home HUD while the panel is up.
-    this.homeButton.visible = false;
-    this.setHomeHovered(false);
 
     this.cb.onProductOpen?.(product.id);
     this.cb.onEvent?.('product_panel_opened', { productId: product.id });
@@ -565,72 +531,15 @@ export class VRSceneEngine {
 
   /* -------------------------------- home -------------------------------- */
 
-  private makeHomeButton(): THREE.Mesh {
-    const S = 256;
-    const canvas = document.createElement('canvas');
-    canvas.width = S;
-    canvas.height = S;
-    const ctx = canvas.getContext('2d')!;
-
-    // Round pill backdrop.
-    ctx.beginPath();
-    ctx.arc(S / 2, S / 2, 118, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(10,10,11,0.72)';
-    ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = 'rgba(201,161,90,0.75)';
-    ctx.stroke();
-
-    // House glyph.
-    ctx.strokeStyle = '#e4cd9a';
-    ctx.lineWidth = 11;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(74, 132); // roof left
-    ctx.lineTo(128, 84); // apex
-    ctx.lineTo(182, 132); // roof right
-    ctx.stroke();
-    ctx.strokeRect(90, 132, 76, 54); // body
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.14, 0.14),
-      new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-        opacity: 0.85,
-      }),
-    );
-    // Bottom-centre of view, ~1.1m ahead (comfortable HUD placement).
-    mesh.position.set(0, -0.42, -1.1);
-    mesh.renderOrder = 50;
-    mesh.name = 'home-button';
-    return mesh;
-  }
-
-  private rayHitsHome(): boolean {
-    return this.raycaster.intersectObject(this.homeButton, false).length > 0;
-  }
-
-  private setHomeHovered(on: boolean): void {
-    if (this.homeHovered === on) return;
-    this.homeHovered = on;
-    (this.homeButton.material as THREE.MeshBasicMaterial).opacity = on ? 1 : 0.85;
-    this.homeButton.scale.setScalar(on ? 1.14 : 1);
-  }
-
-  /** Return to the home (entrance) scene. */
+  /**
+   * Return to the home (entrance) scene. Triggered by the controller `squeeze`
+   * (grip / "pinch") gesture in VR, or the `H` key on desktop.
+   */
   private goHome(): void {
     if (this.sceneManager.currentScene?.id === DEFAULT_SCENE_ID) return;
     if (this.panel.isOpen()) this.closeProductPanel();
     this.cb.onEvent?.('navigation_hotspot_clicked', {
-      hotspotId: 'home-button',
+      hotspotId: 'home-gesture',
       targetSceneId: DEFAULT_SCENE_ID,
     });
     void this.sceneManager.goTo(DEFAULT_SCENE_ID);
