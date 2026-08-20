@@ -87,7 +87,7 @@ lib/
     config.ts           Tuning constants (height, radius, timings…)
 
 data/
-  scenes.ts             Scene graph (entrance → lobby → main-showroom)
+  scenes.ts             Scene graph (currently: a single Main Store scene)
   products.ts           Placeholder catalogue
 
 types/
@@ -124,11 +124,11 @@ Open <http://localhost:3000> → **Enter QWEEN Store**, or go straight to
 
 Useful URLs:
 
-- `/vr?scene=diamond-bar` — deep-link directly into a scene (§25)
+- `/vr?scene=<id>` — deep-link directly into a scene (§25), e.g. `?scene=main-store`
 - `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21)
 
 Desktop controls: **drag** to look, **click** a hotspot, **arrow keys** to look,
-**H** to go home (Entrance), **Esc** to close the product panel.
+**H** to go home, **Esc** to close the product panel.
 
 Other scripts:
 
@@ -172,7 +172,7 @@ Then open `http://localhost:3000/vr` in the Quest Browser.
 In-headset: press **Enter VR**, look around naturally, point a controller (a
 subtle gold ray appears), and pull the **trigger** to select navigation or
 product hotspots. **Squeeze the grip ("pinch") on either controller to jump
-back to the home (Entrance) scene** at any time. There is no forced locomotion —
+back to the home scene** at any time. There is no forced locomotion —
 you travel only by selecting hotspots or the home gesture (§23).
 
 ## 6. How to add a new 360 scene
@@ -189,7 +189,7 @@ you travel only by selecting hotspots or the home gesture (§23).
   environment: { type: 'panorama', source: '/vr/panoramas/vault.jpg' },
   // or, before real photography: source: 'placeholder://vault'
   initialCamera: { yaw: 0, pitch: 0 },
-  preload: ['main-showroom'],
+  preload: ['main-store'],
   hotspots: [ /* see below */ ],
 }
 ```
@@ -205,10 +205,10 @@ Add to a scene's `hotspots` array. **Navigation:**
 
 ```ts
 {
-  id: 'vault-to-showroom',
+  id: 'vault-to-main-store',
   type: 'navigation',
-  label: 'Main Showroom',
-  targetSceneId: 'main-showroom',
+  label: 'Main Store',
+  targetSceneId: 'main-store',
   position: { x: 0, y: -0.1, z: -4 },
 }
 ```
