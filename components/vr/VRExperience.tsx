@@ -135,6 +135,12 @@ export function VRExperience() {
     useVRStore.getState().setMuted(next);
   };
 
+  const handleToggleDebug = () => {
+    const next = !useVRStore.getState().debugEnabled;
+    engineRef.current?.setDebug(next);
+    useVRStore.getState().setDebugEnabled(next);
+  };
+
   const sceneName = currentScene
     ? currentScene.startsWith('custom:')
       ? currentScene.slice('custom:'.length)
@@ -154,9 +160,11 @@ export function VRExperience() {
         sceneName={sceneName}
         isProductPanelOpen={isProductPanelOpen}
         isMuted={isMuted}
+        debugEnabled={debugEnabled}
         onEnterVR={handleEnterVR}
         onCloseProduct={handleCloseProduct}
         onToggleMute={handleToggleMute}
+        onToggleDebug={handleToggleDebug}
       />
 
       {testMode && !isVRMode && (

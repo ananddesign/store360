@@ -69,7 +69,7 @@ app/
 
 components/vr/
   VRExperience.tsx      Client orchestrator: mounts engine, wires store/analytics
-  VRControls.tsx        Enter-VR / desktop hints / zone label / close / mute
+  VRControls.tsx        Enter-VR / desktop hints / zone label / close / mute / debug toggle
   LoadingScreen.tsx     QWEEN-branded loader
   DebugOverlay.tsx      /vr?debug=true HUD
   ViewControlsPanel.tsx /vr?debug=true live eye-height/pitch/radius tuning
@@ -139,6 +139,13 @@ Useful URLs:
   object to paste into `data/scenes.ts` / `lib/vr/config.ts`. Production
   behaviour (no `?debug=true`) is unaffected — this panel only overrides
   values within a debug session.
+
+  The URL param isn't the only way in: a **gear icon** top right (below the
+  mute button) toggles the same debug HUD + View Controls on/off at any
+  time, no URL editing needed — it turns gold while active. Toggling off and
+  back on preserves whatever you've already tuned; the documented defaults
+  are only seeded the very first time it's opened in a session, not on every
+  reopen.
 
   **In the headset itself**, that 2D panel isn't visible — WebXR never
   composites the regular webpage into the immersive view. With `?debug=true`,

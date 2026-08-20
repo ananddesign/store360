@@ -8,9 +8,11 @@ interface VRControlsProps {
   sceneName: string | null;
   isProductPanelOpen: boolean;
   isMuted: boolean;
+  debugEnabled: boolean;
   onEnterVR: () => void;
   onCloseProduct: () => void;
   onToggleMute: () => void;
+  onToggleDebug: () => void;
 }
 
 /**
@@ -29,9 +31,11 @@ export function VRControls({
   sceneName,
   isProductPanelOpen,
   isMuted,
+  debugEnabled,
   onEnterVR,
   onCloseProduct,
   onToggleMute,
+  onToggleDebug,
 }: VRControlsProps) {
   if (isVRMode) return null;
 
@@ -61,11 +65,27 @@ export function VRControls({
         <SpeakerIcon muted={isMuted} />
       </button>
 
+      {/* View Controls toggle — top right, below mute. Enables the debug HUD
+          + View Controls tuning panel (2D here, in-scene 3D once in VR) without
+          needing the ?debug=true URL param. */}
+      <button
+        onClick={onToggleDebug}
+        aria-label={debugEnabled ? 'Hide View Controls' : 'Show View Controls'}
+        title={debugEnabled ? 'Hide View Controls' : 'Show View Controls'}
+        className={`pointer-events-auto absolute right-5 top-20 z-30 flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur transition ${
+          debugEnabled
+            ? 'border-qween-gold bg-qween-gold/90 text-qween-void hover:bg-qween-gold'
+            : 'border-qween-line bg-black/50 text-qween-diamond hover:bg-black/70'
+        }`}
+      >
+        <GearIcon />
+      </button>
+
       {/* Desktop convenience close for the spatial product panel. */}
       {isProductPanelOpen && (
         <button
           onClick={onCloseProduct}
-          className="pointer-events-auto absolute right-5 top-20 z-30 rounded-full border border-qween-line bg-black/50 px-4 py-2 font-sans text-xs uppercase tracking-widest text-qween-diamond backdrop-blur transition hover:bg-black/70"
+          className="pointer-events-auto absolute right-5 top-32 z-30 rounded-full border border-qween-line bg-black/50 px-4 py-2 font-sans text-xs uppercase tracking-widest text-qween-diamond backdrop-blur transition hover:bg-black/70"
         >
           Close ✕
         </button>
@@ -93,6 +113,21 @@ export function VRControls({
         )}
       </div>
     </>
+  );
+}
+
+/** Minimal gear glyph for the View Controls toggle. */
+function GearIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.6} />
+      <path
+        d="M12 3.5v2.1M12 18.4v2.1M20.5 12h-2.1M5.6 12H3.5M17.66 6.34l-1.49 1.49M7.83 16.17l-1.49 1.49M17.66 17.66l-1.49-1.49M7.83 7.83 6.34 6.34"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

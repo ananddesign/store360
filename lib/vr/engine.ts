@@ -99,6 +99,10 @@ export class VRSceneEngine {
   private fpsAccum = 0;
   private fps = 0;
   private debug = false;
+  /** True once the View Controls debug baseline has been seeded (see setDebug) —
+   *  guards against re-seeding (and wiping) a user's own tuning on every
+   *  toggle-off/toggle-on via the top-right gear button. */
+  private debugSeeded = false;
   private debugGizmos = new THREE.Group();
   private debugTimer = 0;
 
@@ -228,10 +232,16 @@ export class VRSceneEngine {
     if (on) {
       // Seed the View Controls panel's own baseline (independent of the
       // shipped VR_CONFIG defaults) so a tuning session starts from a known,
-      // documented state rather than whatever's currently in production.
-      this.setPitchLimit(DEBUG_VIEW_DEFAULTS.pitchLimitDeg);
-      this.setPanoramaRadius(DEBUG_VIEW_DEFAULTS.panoramaRadius);
-      this.setEyeHeight(DEBUG_VIEW_DEFAULTS.eyeHeight);
+      // documented state rather than whatever's currently in production —
+      // but only the very first time debug is turned on. The gear button
+      // lets the user toggle this on/off repeatedly; re-seeding on every
+      // reopen would silently discard whatever they'd already tuned.
+      if (!this.debugSeeded) {
+        this.debugSeeded = true;
+        this.setPitchLimit(DEBUG_VIEW_DEFAULTS.pitchLimitDeg);
+        this.setPanoramaRadius(DEBUG_VIEW_DEFAULTS.panoramaRadius);
+        this.setEyeHeight(DEBUG_VIEW_DEFAULTS.eyeHeight);
+      }
       // If a VR session is already active (debug toggled mid-session), show
       // the in-headset panel immediately rather than waiting for the next
       // enterVR() call.
