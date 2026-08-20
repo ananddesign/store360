@@ -81,6 +81,7 @@ lib/
     sceneManager.ts     Panorama sphere + fade transitions
     hotspotManager.ts   Hotspot markers, labels, hover, raycast
     productPanel.ts     Spatial 3D product panel
+    viewControlsPanel3D.ts  In-headset 3D View Controls (tap +/- steppers)
     textureManager.ts   Panorama load/preload/dispose (§17)
     placeholder.ts      Procedural placeholder panoramas/products/markers
     webxr.ts            WebXR capability detection
@@ -129,15 +130,25 @@ Useful URLs:
 
 - `/vr?scene=<id>` — deep-link directly into a scene (§25), e.g. `?scene=main-store`
 - `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21), plus a
-  compact **View Controls** panel (bottom left) for live-tuning eye height,
-  the desktop pitch-look limit, panorama sphere radius, and the current look
-  orientation — all applied immediately, no scene reload. Handy for dialing
-  in comfort on an actual Quest before hardcoding values. Reset restores the
-  panel's own defaults; Copy Settings copies the current numbers as a small
+  compact **View Controls** panel (bottom left, desktop only — see below) for
+  live-tuning eye height, the desktop pitch-look limit, panorama sphere
+  radius, and the current look orientation — all applied immediately, no
+  scene reload. Reset restores the panel's own defaults; Copy Settings copies
+  the current numbers as a small
   `{ eyeHeight, pitchLimit, panoramaRadius, initialPitch, initialYaw }`
   object to paste into `data/scenes.ts` / `lib/vr/config.ts`. Production
   behaviour (no `?debug=true`) is unaffected — this panel only overrides
   values within a debug session.
+
+  **In the headset itself**, that 2D panel isn't visible — WebXR never
+  composites the regular webpage into the immersive view. With `?debug=true`,
+  entering VR spawns a real 3D counterpart (`viewControlsPanel3D.ts`) floating
+  in front of you: the same five values, adjusted by tapping small `−`/`+`
+  buttons per row with the controller trigger (a Reset button too). Steps are
+  coarser than the desktop slider's `step` — dragging a slider precisely with
+  a VR pointer ray is uncomfortable in practice, so taps are the more
+  reliable pattern. This is the tool for dialing in comfort while actually
+  wearing the Quest.
 
 Desktop controls: **drag** to look, **click** a hotspot, **arrow keys** to look,
 **H** to go home, **Esc** to close the product panel. A subtle looping

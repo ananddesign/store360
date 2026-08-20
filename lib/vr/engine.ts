@@ -6,7 +6,8 @@ import { TextureManager } from './textureManager';
 import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
-import { VR_CONFIG, DEG2RAD, DEBUG_VIEW_DEFAULTS } from './config';
+import { ViewControlsPanel3D, type ViewControlAction } from './viewControlsPanel3D';
+import { VR_CONFIG, DEG2RAD, DEBUG_VIEW_DEFAULTS, DEBUG_VIEW_RANGES, DEBUG_VIEW_VR_STEPS } from './config';
 
 export interface DebugInfo {
   sceneId: string | null;
@@ -66,6 +67,10 @@ export class VRSceneEngine {
   private hotspots: HotspotManager;
   private sceneManager: SceneManager;
   private panel: ProductPanel3D;
+  /** In-scene (real 3D geometry) counterpart of the 2D debug ViewControlsPanel
+   *  — a DOM overlay is never composited into an immersive session, so this
+   *  is the only way to see/use it while actually wearing the headset. */
+  private viewControlsPanel3D = new ViewControlsPanel3D();
 
   // Desktop look state.
   private yaw = 0;
@@ -134,6 +139,8 @@ export class VRSceneEngine {
     this.panel = new ProductPanel3D(this.textures);
     this.scene.add(this.panel.group);
 
+    this.scene.add(this.viewControlsPanel3D.group);
+
     this.debugGizmos.visible = false;
     this.scene.add(this.debugGizmos);
 
@@ -184,6 +191,7 @@ export class VRSceneEngine {
     this.sceneManager.dispose();
     this.hotspots.dispose();
     this.panel.dispose();
+    this.viewControlsPanel3D.dispose();
     this.textures.disposeAll();
     this.clearDebugGizmos();
     this.renderer.dispose();
@@ -224,9 +232,15 @@ export class VRSceneEngine {
       this.setPitchLimit(DEBUG_VIEW_DEFAULTS.pitchLimitDeg);
       this.setPanoramaRadius(DEBUG_VIEW_DEFAULTS.panoramaRadius);
       this.setEyeHeight(DEBUG_VIEW_DEFAULTS.eyeHeight);
+      // If a VR session is already active (debug toggled mid-session), show
+      // the in-headset panel immediately rather than waiting for the next
+      // enterVR() call.
+      if (this.renderer.xr.isPresenting) this.showViewControlsPanel3D();
       // Push an immediate snapshot so the overlay populates without waiting
       // for the throttled loop tick (also helps when the tab is backgrounded).
       this.cb.onDebugUpdate?.(this.getDebugInfo());
+    } else {
+      this.viewControlsPanel3D.hide();
     }
   }
 
@@ -281,6 +295,63 @@ export class VRSceneEngine {
     };
   }
 
+  /** Spawn the in-headset View Controls panel in front of the user's current gaze. */
+  private showViewControlsPanel3D(): void {
+    const head = this.renderer.xr.isPresenting ? this.renderer.xr.getCamera() : this.camera;
+    const headPos = head.getWorldPosition(new THREE.Vector3());
+    const forward = head.getWorldDirection(new THREE.Vector3());
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-4) forward.set(0, 0, -1);
+    forward.normalize();
+    const position = headPos.clone().addScaledVector(forward, 1.9);
+    position.y = headPos.y - 0.1;
+    this.viewControlsPanel3D.show(this.getViewTuning(), position, headPos);
+  }
+
+  /** Step one field by its configured VR tap size, clamped to its range. */
+  private stepViewTuning(field: keyof ViewTuning, dir: 1 | -1): void {
+    const t = this.getViewTuning();
+    const range = DEBUG_VIEW_RANGES[field];
+    const step = DEBUG_VIEW_VR_STEPS[field];
+    const next = THREE.MathUtils.clamp(t[field] + dir * step, range.min, range.max);
+    switch (field) {
+      case 'eyeHeight':
+        this.setEyeHeight(next);
+        break;
+      case 'pitchLimitDeg':
+        this.setPitchLimit(next);
+        break;
+      case 'panoramaRadius':
+        this.setPanoramaRadius(next);
+        break;
+      case 'initialPitchDeg':
+        this.setLookOrientation(t.initialYawDeg, next);
+        break;
+      case 'initialYawDeg':
+        this.setLookOrientation(next, t.initialPitchDeg);
+        break;
+    }
+    this.viewControlsPanel3D.updateValues(this.getViewTuning());
+  }
+
+  /** Restore the debug panel's own defaults (Initial Yaw resets to the current scene's configured yaw). */
+  private resetViewTuning(): void {
+    const yaw = this.sceneManager.currentScene?.initialCamera?.yaw ?? 0;
+    this.setEyeHeight(DEBUG_VIEW_DEFAULTS.eyeHeight);
+    this.setPitchLimit(DEBUG_VIEW_DEFAULTS.pitchLimitDeg);
+    this.setPanoramaRadius(DEBUG_VIEW_DEFAULTS.panoramaRadius);
+    this.setLookOrientation(yaw, DEBUG_VIEW_DEFAULTS.initialPitchDeg);
+    this.viewControlsPanel3D.updateValues(this.getViewTuning());
+  }
+
+  private handleViewControlsAction(action: ViewControlAction): void {
+    if (action.kind === 'reset') {
+      this.resetViewTuning();
+    } else {
+      this.stepViewTuning(action.field, action.dir);
+    }
+  }
+
   /** Request an immersive-vr session (§8). Rejects if unsupported. */
   async enterVR(): Promise<void> {
     if (!('xr' in navigator) || !navigator.xr) throw new Error('WebXR not available');
@@ -290,9 +361,11 @@ export class VRSceneEngine {
     await this.renderer.xr.setSession(session);
     this.cb.onVRSessionChange?.(true);
     this.cb.onEvent?.('vr_entered');
+    if (this.debug) this.showViewControlsPanel3D();
     session.addEventListener('end', () => {
       this.cb.onVRSessionChange?.(false);
       this.cb.onEvent?.('vr_exited');
+      this.viewControlsPanel3D.hide();
     });
   }
 
@@ -518,6 +591,7 @@ export class VRSceneEngine {
       // Nothing hovered anywhere — make sure highlights clear.
       this.hotspots.setHovered(null);
       this.panel.setHoveredAction(null);
+      this.viewControlsPanel3D.setHovered(null);
     }
   }
 
@@ -529,6 +603,18 @@ export class VRSceneEngine {
    * hit distance (or null if nothing interactive).
    */
   private resolveHover(): number | null {
+    // View Controls panel (debug) first — it's a persistent tool while open.
+    if (this.viewControlsPanel3D.isOpen()) {
+      const hit = this.viewControlsPanel3D.raycast(this.raycaster);
+      this.viewControlsPanel3D.setHovered(hit?.object ?? null);
+      if (hit) {
+        this.panel.setHoveredAction(null);
+        this.hotspots.setHovered(null);
+        this.setCursor(true);
+        return 1.9;
+      }
+    }
+
     // Panel buttons first.
     if (this.panel.isOpen()) {
       const action = this.panel.raycast(this.raycaster);
@@ -556,7 +642,16 @@ export class VRSceneEngine {
 
   /** Act on whatever the current `raycaster` points at. */
   private performSelect(): void {
-    // 1) Product panel buttons.
+    // 1) View Controls panel (debug).
+    if (this.viewControlsPanel3D.isOpen()) {
+      const hit = this.viewControlsPanel3D.raycast(this.raycaster);
+      if (hit) {
+        this.handleViewControlsAction(hit.action);
+        return;
+      }
+    }
+
+    // 2) Product panel buttons.
     if (this.panel.isOpen()) {
       const action = this.panel.raycast(this.raycaster);
       if (action) {
@@ -565,7 +660,7 @@ export class VRSceneEngine {
       }
     }
 
-    // 2) Hotspots.
+    // 3) Hotspots.
     const hit = this.hotspots.raycast(this.raycaster);
     if (!hit) return;
     const h = hit.hotspot;

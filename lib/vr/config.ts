@@ -73,3 +73,19 @@ export const DEBUG_VIEW_RANGES = {
   initialPitchDeg: { min: -20, max: 20, step: 1 },
   initialYawDeg: { min: -180, max: 180, step: 1 },
 } as const;
+
+/**
+ * Tap-step size for the in-headset 3D View Controls panel
+ * (lib/vr/viewControlsPanel3D.ts). Coarser than DEBUG_VIEW_RANGES' `step`
+ * (which sizes the desktop 2D slider) — precise continuous dragging via a
+ * controller ray is uncomfortable in practice, so the in-VR panel uses
+ * discrete +/- taps instead; these sizes keep a full sweep across each
+ * range to a reasonable number of taps.
+ */
+export const DEBUG_VIEW_VR_STEPS = {
+  eyeHeight: 0.05,
+  pitchLimitDeg: 5,
+  panoramaRadius: 10,
+  initialPitchDeg: 5,
+  initialYawDeg: 15,
+} as const;
