@@ -7,25 +7,31 @@ interface VRControlsProps {
   isVRMode: boolean;
   sceneName: string | null;
   isProductPanelOpen: boolean;
+  isMuted: boolean;
   onEnterVR: () => void;
   onCloseProduct: () => void;
+  onToggleMute: () => void;
 }
 
 /**
  * 2D chrome shown outside the immersive session: the current-zone label, the
- * Enter-VR / desktop-fallback call to action (§8), and a desktop convenience
- * Close button for the (in-scene) product panel (§13/§20).
+ * Enter-VR / desktop-fallback call to action (§8), a desktop convenience
+ * Close button for the (in-scene) product panel (§13/§20), and the ambient
+ * music mute toggle.
  *
  * Kept minimal and out of the field of view (§14). Hidden entirely once a VR
- * session is presenting — the headset shows only the spatial UI.
+ * session is presenting — the headset shows only the spatial UI (the ambient
+ * track itself keeps playing through the headset's audio output).
  */
 export function VRControls({
   xrSupport,
   isVRMode,
   sceneName,
   isProductPanelOpen,
+  isMuted,
   onEnterVR,
   onCloseProduct,
+  onToggleMute,
 }: VRControlsProps) {
   if (isVRMode) return null;
 
@@ -45,11 +51,21 @@ export function VRControls({
         </div>
       )}
 
+      {/* Ambient music toggle — top right. */}
+      <button
+        onClick={onToggleMute}
+        aria-label={isMuted ? 'Unmute ambient music' : 'Mute ambient music'}
+        title={isMuted ? 'Unmute ambient music' : 'Mute ambient music'}
+        className="pointer-events-auto absolute right-5 top-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-qween-line bg-black/50 text-qween-diamond backdrop-blur transition hover:bg-black/70"
+      >
+        <SpeakerIcon muted={isMuted} />
+      </button>
+
       {/* Desktop convenience close for the spatial product panel. */}
       {isProductPanelOpen && (
         <button
           onClick={onCloseProduct}
-          className="pointer-events-auto absolute right-5 top-5 z-30 rounded-full border border-qween-line bg-black/50 px-4 py-2 font-sans text-xs uppercase tracking-widest text-qween-diamond backdrop-blur transition hover:bg-black/70"
+          className="pointer-events-auto absolute right-5 top-20 z-30 rounded-full border border-qween-line bg-black/50 px-4 py-2 font-sans text-xs uppercase tracking-widest text-qween-diamond backdrop-blur transition hover:bg-black/70"
         >
           Close ✕
         </button>
@@ -77,5 +93,36 @@ export function VRControls({
         )}
       </div>
     </>
+  );
+}
+
+/** Minimal speaker glyph, with a slash overlay when muted. */
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 9v6h4l5 4V5L8 9H4Z"
+        fill="currentColor"
+        opacity={0.9}
+      />
+      {!muted && (
+        <path
+          d="M16.5 8.5a5 5 0 0 1 0 7"
+          stroke="currentColor"
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          opacity={0.8}
+        />
+      )}
+      {muted && (
+        <path
+          d="M15.5 9.5 20 14M20 9.5l-4.5 4.5"
+          stroke="currentColor"
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          opacity={0.9}
+        />
+      )}
+    </svg>
   );
 }

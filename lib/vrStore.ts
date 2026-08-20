@@ -31,6 +31,9 @@ interface VRState {
   debugEnabled: boolean;
   debugInfo: DebugInfo | null;
 
+  // Ambient audio.
+  isMuted: boolean;
+
   // Actions.
   setScene: (current: string, previous: string | null) => void;
   setProduct: (productId: string | null) => void;
@@ -43,6 +46,7 @@ interface VRState {
   setTransitioning: (transitioning: boolean) => void;
   setDebugEnabled: (on: boolean) => void;
   setDebugInfo: (info: DebugInfo) => void;
+  setMuted: (muted: boolean) => void;
 }
 
 export const useVRStore = create<VRState>((set) => ({
@@ -59,6 +63,7 @@ export const useVRStore = create<VRState>((set) => ({
   isTransitioning: false,
   debugEnabled: false,
   debugInfo: null,
+  isMuted: false,
 
   setScene: (current, previous) => set({ currentScene: current, previousScene: previous }),
   setProduct: (productId) =>
@@ -72,6 +77,7 @@ export const useVRStore = create<VRState>((set) => ({
   setTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
   setDebugEnabled: (on) => set({ debugEnabled: on }),
   setDebugInfo: (info) => set({ debugInfo: info }),
+  setMuted: (muted) => set({ isMuted: muted }),
 }));
 
 // Dev-only: expose the store for inspection from the console.

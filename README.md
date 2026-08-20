@@ -69,7 +69,7 @@ app/
 
 components/vr/
   VRExperience.tsx      Client orchestrator: mounts engine, wires store/analytics
-  VRControls.tsx        Enter-VR / desktop hints / zone label / close
+  VRControls.tsx        Enter-VR / desktop hints / zone label / close / mute
   LoadingScreen.tsx     QWEEN-branded loader
   DebugOverlay.tsx      /vr?debug=true HUD
 
@@ -84,6 +84,7 @@ lib/
     placeholder.ts      Procedural placeholder panoramas/products/markers
     webxr.ts            WebXR capability detection
     analytics.ts        Vendor-agnostic trackEvent (§24)
+    ambientAudio.ts      Looping background music, autoplay-safe
     config.ts           Tuning constants (height, radius, timings…)
 
 data/
@@ -94,6 +95,7 @@ types/
   vr.ts                 Scene/hotspot/product/analytics types
 
 public/vr/panoramas|products|icons/   Drop real assets here
+public/vr/audio/ambient.mp3           Looping background music
 
 docs/HOTSPOTS.md        How to author hotspot coordinates
 ```
@@ -128,7 +130,12 @@ Useful URLs:
 - `/vr?debug=true` — developer HUD + in-scene hotspot gizmos (§21)
 
 Desktop controls: **drag** to look, **click** a hotspot, **arrow keys** to look,
-**H** to go home, **Esc** to close the product panel.
+**H** to go home, **Esc** to close the product panel. A subtle looping
+ambient track (`public/vr/audio/ambient.mp3`) plays throughout — use the
+speaker icon (top right) to mute/unmute. Browsers block autoplay until a
+user gesture; playback starts automatically on the first click/keypress if
+it didn't start immediately. Swap the file to change the track — nothing
+else needs to change.
 
 Other scripts:
 

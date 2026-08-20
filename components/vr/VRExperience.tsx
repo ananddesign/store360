@@ -5,6 +5,7 @@ import { useVRStore } from '@/lib/vrStore';
 import { VRSceneEngine } from '@/lib/vr/engine';
 import { detectXRSupport } from '@/lib/vr/webxr';
 import { trackEvent, flushSession } from '@/lib/vr/analytics';
+import { AmbientAudio } from '@/lib/vr/ambientAudio';
 import { DEFAULT_SCENE_ID, getSceneById, sceneExists } from '@/data/scenes';
 import { LoadingScreen } from './LoadingScreen';
 import { VRControls } from './VRControls';
@@ -26,6 +27,7 @@ import { PanoramaTester } from './PanoramaTester';
 export function VRExperience() {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VRSceneEngine | null>(null);
+  const audioRef = useRef<AmbientAudio | null>(null);
   const [testMode, setTestMode] = useState(false);
 
   const {
@@ -38,6 +40,7 @@ export function VRExperience() {
     currentScene,
     debugEnabled,
     debugInfo,
+    isMuted,
   } = useVRStore();
 
   useEffect(() => {
@@ -90,6 +93,16 @@ export function VRExperience() {
 
     void engine.start(initialScene);
 
+    // Ambient background music — starts muted-by-policy until a user gesture;
+    // AmbientAudio retries automatically on the first click/keypress.
+    const audio = new AmbientAudio('/vr/audio/ambient.mp3');
+    audio.setMuted(store.isMuted);
+    audio.start();
+    audioRef.current = audio;
+    if (process.env.NODE_ENV !== 'production') {
+      (window as unknown as { __vrAudio?: AmbientAudio }).__vrAudio = audio;
+    }
+
     const onUnload = () => flushSession();
     window.addEventListener('beforeunload', onUnload);
 
@@ -99,6 +112,8 @@ export function VRExperience() {
       flushSession();
       engine.dispose();
       engineRef.current = null;
+      audio.dispose();
+      audioRef.current = null;
     };
   }, []);
 
@@ -111,6 +126,12 @@ export function VRExperience() {
 
   const handleCloseProduct = () => {
     engineRef.current?.closeProductPanel();
+  };
+
+  const handleToggleMute = () => {
+    const next = !useVRStore.getState().isMuted;
+    audioRef.current?.setMuted(next);
+    useVRStore.getState().setMuted(next);
   };
 
   const sceneName = currentScene
@@ -131,8 +152,10 @@ export function VRExperience() {
         isVRMode={isVRMode}
         sceneName={sceneName}
         isProductPanelOpen={isProductPanelOpen}
+        isMuted={isMuted}
         onEnterVR={handleEnterVR}
         onCloseProduct={handleCloseProduct}
+        onToggleMute={handleToggleMute}
       />
 
       {testMode && !isVRMode && (
