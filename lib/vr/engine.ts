@@ -586,6 +586,14 @@ export class VRSceneEngine {
     this.pointerMoved = 0;
     this.pointerDown.set(e.clientX, e.clientY);
     this.lastPointer.set(e.clientX, e.clientY);
+    // Seed the pick ray from the press location. On touch a tap often fires no
+    // pointermove first, so without this a tap would select from a stale point
+    // (the last hover / screen centre) and miss — breaking tap-to-navigate.
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.hoverFromPointer.set(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
   };
 
   private onPointerMove = (e: PointerEvent) => {
@@ -785,8 +793,10 @@ export class VRSceneEngine {
       if (this.panel.isOpen()) this.closeProductPanel();
       // Gently orient toward the destination (§3) — plays out while the
       // scene fades to black, so it's felt but never blocks the transition.
+      // A floor pad sits on the ground, so orient by heading only (level
+      // pitch) — "walk forward", never tip the gaze down to the floor.
       const { yaw, pitch } = directionToYawPitch(h.position);
-      this.animateLookTo(yaw, pitch, 300);
+      this.animateLookTo(yaw, h.style === 'floor' ? 0 : pitch, 300);
       this.sceneManager.goTo(h.targetSceneId);
     } else {
       this.openProduct(h);

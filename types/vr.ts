@@ -65,6 +65,14 @@ export interface NavigationHotspot extends HotspotBase {
   type: 'navigation';
   label: string;
   targetSceneId: string;
+  /**
+   * Visual treatment. `billboard` (default) is the camera-facing diamond
+   * marker; `floor` is a flat, floor-anchored luminous projection (a QWEEN
+   * "floor pad") that lies parallel to the ground — see lib/vr/floorHotspot.ts.
+   */
+  style?: 'billboard' | 'floor';
+  /** Optional accent colour override (hex). Floor pads default to ice-cyan. */
+  color?: string;
 }
 
 export interface ProductHotspot extends HotspotBase {

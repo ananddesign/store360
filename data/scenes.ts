@@ -19,11 +19,13 @@ function buildScenes(): VRScene[] {
     for (const [nodeId, node] of Object.entries(floor.nodes)) {
       const id = sceneIdFor(floorId, nodeId);
       const hotspots: NavigationHotspot[] = node.hotspots.map((h) => ({
-        id: `${id}-to-${h.target}`,
+        id: `${id}-to-${h.target}${h.style === 'floor' ? '-floor' : ''}`,
         type: 'navigation',
         label: h.label ?? 'Explore',
         targetSceneId: sceneIdFor(floorId, h.target),
         position: h.position,
+        ...(h.style ? { style: h.style } : {}),
+        ...(h.color ? { color: h.color } : {}),
       }));
       scenes.push({
         id,

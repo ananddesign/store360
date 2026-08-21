@@ -2,16 +2,24 @@ import * as THREE from 'three';
 import type { VRHotspot, VRScene } from '@/types/vr';
 import type { TextureManager } from './textureManager';
 import { VR_CONFIG } from './config';
+import { FloorHotspot } from './floorHotspot';
 
-/** A hotspot marker plus its resolved label, living in the scene graph. */
+/** A hotspot's visual(s) plus its resolved label, living in the scene graph. */
 interface HotspotObject {
   hotspot: VRHotspot;
-  marker: THREE.Sprite;
+  /** Raycast target: the billboard sprite, or a floor pad's hit disc. */
+  marker: THREE.Object3D;
+  /** Billboard visual (billboard-style hotspots). */
+  sprite?: THREE.Sprite;
+  /** Floor-projection visual (floor-style hotspots). */
+  floor?: FloorHotspot;
   label: THREE.Sprite;
   baseScale: number;
   /** Current hover interpolation 0→1. */
   hover: number;
 }
+
+const FLOOR_COLOR = '#9fe4ff';
 
 /**
  * Owns the 3D hotspot markers for the current scene: creation, hover
@@ -40,7 +48,7 @@ export class HotspotManager {
       this.objects.push(this.createObject(hotspot));
     }
     for (const obj of this.objects) {
-      this.group.add(obj.marker);
+      this.group.add(obj.floor ? obj.floor.group : obj.sprite!);
       this.group.add(obj.label);
     }
     this.setHovered(null);
@@ -52,19 +60,24 @@ export class HotspotManager {
       const target = obj === this.hovered ? 1 : 0;
       obj.hover += (target - obj.hover) * 0.18;
 
-      const pulse =
-        obj.hotspot.type === 'navigation'
-          ? 1 + Math.sin(elapsed * 2) * 0.04
-          : 1 + Math.sin(elapsed * 3 + obj.marker.position.x) * 0.06;
+      if (obj.floor) {
+        // Floor pad owns its own (flat, slow, architectural) animation.
+        obj.floor.update(elapsed, obj.hover);
+      } else if (obj.sprite) {
+        const pulse =
+          obj.hotspot.type === 'navigation'
+            ? 1 + Math.sin(elapsed * 2) * 0.04
+            : 1 + Math.sin(elapsed * 3 + obj.sprite.position.x) * 0.06;
 
-      const scale =
-        obj.baseScale *
-        pulse *
-        (1 + obj.hover * (VR_CONFIG.hotspot.hoverScale - 1));
-      obj.marker.scale.setScalar(scale);
+        const scale =
+          obj.baseScale *
+          pulse *
+          (1 + obj.hover * (VR_CONFIG.hotspot.hoverScale - 1));
+        obj.sprite.scale.setScalar(scale);
 
-      const markerMat = obj.marker.material as THREE.SpriteMaterial;
-      markerMat.opacity = 0.72 + obj.hover * 0.28;
+        const markerMat = obj.sprite.material as THREE.SpriteMaterial;
+        markerMat.opacity = 0.72 + obj.hover * 0.28;
+      }
 
       // Labels reveal only on hover/tap — the marker itself is the minimal,
       // always-visible navigation cue (§2: "no large arrows or game-like UI").
@@ -100,9 +113,14 @@ export class HotspotManager {
 
   clear(): void {
     for (const obj of this.objects) {
-      this.group.remove(obj.marker);
+      if (obj.floor) {
+        this.group.remove(obj.floor.group);
+        obj.floor.dispose();
+      } else if (obj.sprite) {
+        this.group.remove(obj.sprite);
+        (obj.sprite.material as THREE.SpriteMaterial).dispose();
+      }
       this.group.remove(obj.label);
-      (obj.marker.material as THREE.SpriteMaterial).dispose();
       (obj.label.material as THREE.SpriteMaterial).dispose();
     }
     this.objects = [];
@@ -118,6 +136,17 @@ export class HotspotManager {
   /* ------------------------------ internals ----------------------------- */
 
   private createObject(hotspot: VRHotspot): HotspotObject {
+    const pos = new THREE.Vector3(hotspot.position.x, hotspot.position.y, hotspot.position.z);
+
+    // Floor-projection ("floor pad") variant — a flat, floor-anchored marker.
+    if (hotspot.type === 'navigation' && hotspot.style === 'floor') {
+      const floor = new FloorHotspot({ position: pos, color: hotspot.color ?? FLOOR_COLOR });
+      // Label floats above the pad so it stays readable off the ground.
+      const label = this.createLabel(this.resolveLabel(hotspot), pos, 1.0);
+      return { hotspot, marker: floor.hitMesh, floor, label, baseScale: 1, hover: 0 };
+    }
+
+    // Billboard variant — the camera-facing diamond / sparkle sprite.
     const accent = hotspot.type === 'navigation' ? '#c9a15a' : '#d8e6ef';
     const markerMat = new THREE.SpriteMaterial({
       map: this.textures.getHotspotTexture(hotspot.type, accent),
@@ -125,39 +154,44 @@ export class HotspotManager {
       depthTest: false,
       depthWrite: false,
     });
-    const marker = new THREE.Sprite(markerMat);
-    marker.position.set(hotspot.position.x, hotspot.position.y, hotspot.position.z);
-    marker.renderOrder = 10;
+    const sprite = new THREE.Sprite(markerMat);
+    sprite.position.copy(pos);
+    sprite.renderOrder = 10;
 
     const baseScale =
       hotspot.type === 'navigation'
         ? VR_CONFIG.hotspot.navScale
         : VR_CONFIG.hotspot.productScale;
-    marker.scale.setScalar(baseScale);
+    sprite.scale.setScalar(baseScale);
 
-    // Label sits just above the marker.
-    const labelText = this.resolveLabel(hotspot);
+    const label = this.createLabel(this.resolveLabel(hotspot), pos, baseScale * 0.9);
+    return { hotspot, marker: sprite, sprite, label, baseScale, hover: 0 };
+  }
+
+  /**
+   * Build a hover-revealed label sprite floating `up` metres above a world
+   * point, pulled a hair toward the camera so it never clips into its marker.
+   */
+  private createLabel(text: string, at: THREE.Vector3, up: number): THREE.Sprite {
     const labelMat = new THREE.SpriteMaterial({
-      map: this.getLabelTexture(labelText),
+      map: this.getLabelTexture(text),
       transparent: true,
       depthTest: false,
       depthWrite: false,
       opacity: 0,
     });
     const label = new THREE.Sprite(labelMat);
-    const dir = marker.position.clone().normalize();
+    const dir = at.clone().normalize();
     label.position
-      .copy(marker.position)
-      .add(new THREE.Vector3(0, baseScale * 0.9, 0))
+      .copy(at)
+      .add(new THREE.Vector3(0, up, 0))
       .addScaledVector(dir, -0.01);
-    // Label aspect: width : height derived from the texture canvas.
-    const aspect = (label.material.map!.image as HTMLCanvasElement).width /
-      (label.material.map!.image as HTMLCanvasElement).height;
+    const img = labelMat.map!.image as HTMLCanvasElement;
+    const aspect = img.width / img.height;
     const labelHeight = 0.22;
     label.scale.set(labelHeight * aspect, labelHeight, 1);
     label.renderOrder = 11;
-
-    return { hotspot, marker, label, baseScale, hover: 0 };
+    return label;
   }
 
   private getLabelTexture(text: string): THREE.Texture {

@@ -22,6 +22,15 @@ export interface FloorHotspotConfig {
   position: Vec3;
   /** Hover / tap label. Defaults to "Explore". */
   label?: string;
+  /**
+   * Visual treatment. Omit for the default camera-facing diamond marker;
+   * `'floor'` renders a flat, floor-anchored luminous projection (a QWEEN
+   * "floor pad"). For a floor pad, `position` should sit on the ground —
+   * y ≈ −(eye height) and a few metres ahead.
+   */
+  style?: 'billboard' | 'floor';
+  /** Optional accent colour override (hex). Floor pads default to ice-cyan. */
+  color?: string;
 }
 
 export interface FloorNodeConfig {
@@ -48,6 +57,13 @@ export interface FloorConfig {
 
 const FORWARD: Vec3 = { x: 0, y: -0.15, z: -4 };
 const BACKWARD: Vec3 = { x: 0, y: -0.15, z: 4 };
+
+/**
+ * A floor-pad position: on the ground (y ≈ −eye height) a few metres ahead,
+ * in the open floor area. The QWEEN floor projection lies flat here. Tune per
+ * scene so it lands in front of / beneath the focal furniture, never over it.
+ */
+const FLOOR_AHEAD: Vec3 = { x: 0, y: -1.5, z: -3 };
 
 export const floors: Record<string, FloorConfig> = {
   ground: {
@@ -95,6 +111,14 @@ export const floors: Record<string, FloorConfig> = {
         hotspots: [
           { target: 'entry', position: BACKWARD },
           { target: 'last', position: FORWARD },
+          // Premium floor projection on the open floor beneath the central
+          // podium — a flat, floor-anchored "explore" pad (§FloorHotspot).
+          {
+            target: 'last',
+            position: FLOOR_AHEAD,
+            style: 'floor',
+            label: 'Explore Floor',
+          },
         ],
       },
       last: {
