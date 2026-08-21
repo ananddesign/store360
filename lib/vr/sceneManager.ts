@@ -25,6 +25,8 @@ export class SceneManager {
   private fade: THREE.Mesh;
   private fadeValue = 1; // start black; first load fades in.
   private fadeTarget = 1;
+  private fadeFrom = 1;
+  private fadeElapsed = 0;
   private fadeResolvers: Array<() => void> = [];
 
   private current: VRScene | null = null;
@@ -79,15 +81,13 @@ export class SceneManager {
   /** Advance fade interpolation. Call every frame with delta seconds. */
   update(dt: number): void {
     if (this.fadeValue !== this.fadeTarget) {
-      const speed = 1 / (VR_CONFIG.transitionMs / 1000 / 2); // half-duration per direction
-      const step = speed * dt;
-      if (this.fadeValue < this.fadeTarget) {
-        this.fadeValue = Math.min(this.fadeTarget, this.fadeValue + step);
-      } else {
-        this.fadeValue = Math.max(this.fadeTarget, this.fadeValue - step);
-      }
+      const halfDuration = VR_CONFIG.transitionMs / 1000 / 2; // half-duration per direction
+      this.fadeElapsed += dt;
+      const t = Math.min(1, this.fadeElapsed / halfDuration);
+      this.fadeValue = lerp(this.fadeFrom, this.fadeTarget, easeInOutCubic(t));
       (this.fade.material as THREE.MeshBasicMaterial).opacity = this.fadeValue;
-      if (this.fadeValue === this.fadeTarget) {
+      if (t >= 1) {
+        this.fadeValue = this.fadeTarget;
         const resolvers = this.fadeResolvers;
         this.fadeResolvers = [];
         for (const r of resolvers) r();
@@ -216,6 +216,8 @@ export class SceneManager {
   /* ------------------------------ internals ----------------------------- */
 
   private fadeTo(target: number): Promise<void> {
+    this.fadeFrom = this.fadeValue;
+    this.fadeElapsed = 0;
     this.fadeTarget = target;
     if (this.fadeValue === target) return Promise.resolve();
     return new Promise((resolve) => this.fadeResolvers.push(resolve));
@@ -232,4 +234,12 @@ export class SceneManager {
     // Dispose panoramas that aren't the current, previous, or a preload target.
     this.textures.retainOnly(keep);
   }
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }

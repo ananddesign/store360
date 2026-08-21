@@ -14,8 +14,9 @@ export const VR_CONFIG = {
   /** Field of view for the desktop / fallback camera (deg). */
   desktopFov: 70,
 
-  /** Scene fade transition duration (ms) — §16 target 300–700ms. */
-  transitionMs: 500,
+  /** Scene fade transition duration (ms), ease-in-out — 700–1000ms target
+   *  for the premium multi-floor navigation (never a hard cut). */
+  transitionMs: 850,
 
   /** Symmetric desktop drag-look pitch clamp (deg). Also the initial value of
    *  the debug "Vertical View / Pitch" limit. Set to the upward hard limit so

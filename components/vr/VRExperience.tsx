@@ -7,8 +7,14 @@ import { detectXRSupport } from '@/lib/vr/webxr';
 import { trackEvent, flushSession } from '@/lib/vr/analytics';
 import { AmbientAudio } from '@/lib/vr/ambientAudio';
 import { DEFAULT_SCENE_ID, getSceneById, sceneExists } from '@/data/scenes';
+import {
+  floors,
+  floorOrder,
+  getFloorIdForScene,
+  getFloorEntrySceneId,
+} from '@/data/floors';
 import { LoadingScreen } from './LoadingScreen';
-import { VRControls } from './VRControls';
+import { VRControls, type FloorOption } from './VRControls';
 import { DebugOverlay } from './DebugOverlay';
 import { PanoramaTester } from './PanoramaTester';
 import { ViewControlsPanel } from './ViewControlsPanel';
@@ -25,6 +31,15 @@ import { ViewControlsPanel } from './ViewControlsPanel';
  * Deep links: `?scene=<id>` opens directly into a scene (§25); `?debug=true`
  * enables the debug overlay + in-scene gizmos (§21).
  */
+
+/** Floor selector options — derived once from the static floor graph (§4/§8). */
+const FLOOR_OPTIONS: FloorOption[] = floorOrder
+  .map((id) => {
+    const floor = floors[id];
+    return floor ? { id, label: floor.label } : null;
+  })
+  .filter((f): f is FloorOption => f !== null);
+
 export function VRExperience() {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<VRSceneEngine | null>(null);
@@ -141,6 +156,24 @@ export function VRExperience() {
     useVRStore.getState().setDebugEnabled(next);
   };
 
+  /** Floor selector (§4): switch to a floor's Entry panorama — a smooth
+   *  in-scene transition, never a reload. No-op if already on that floor. */
+  const handleSelectFloor = (floorId: string) => {
+    if (getFloorIdForScene(currentScene ?? '') === floorId) return;
+    const target = getFloorEntrySceneId(floorId);
+    if (target) engineRef.current?.goToScene(target);
+  };
+
+  /** Warm a floor's Entry panorama on hover/touch of its selector label (§9). */
+  const handlePreloadFloor = (floorId: string) => {
+    const target = getFloorEntrySceneId(floorId);
+    if (target) engineRef.current?.preloadScene(target);
+  };
+
+  const handleRecenter = () => {
+    engineRef.current?.recenterView();
+  };
+
   const sceneName = currentScene
     ? currentScene.startsWith('custom:')
       ? currentScene.slice('custom:'.length)
@@ -161,10 +194,15 @@ export function VRExperience() {
         isProductPanelOpen={isProductPanelOpen}
         isMuted={isMuted}
         debugEnabled={debugEnabled}
+        floors={FLOOR_OPTIONS}
+        activeFloorId={currentScene ? getFloorIdForScene(currentScene) : null}
         onEnterVR={handleEnterVR}
         onCloseProduct={handleCloseProduct}
         onToggleMute={handleToggleMute}
         onToggleDebug={handleToggleDebug}
+        onSelectFloor={handleSelectFloor}
+        onPreloadFloor={handlePreloadFloor}
+        onRecenter={handleRecenter}
       />
 
       {testMode && !isVRMode && (

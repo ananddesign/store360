@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CameraOrientation, VRHotspot, VRScene } from '@/types/vr';
 import { getProductById } from '@/data/products';
-import { DEFAULT_SCENE_ID } from '@/data/scenes';
+import { DEFAULT_SCENE_ID, getSceneById } from '@/data/scenes';
 import { TextureManager } from './textureManager';
 import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
@@ -89,6 +89,18 @@ export class VRSceneEngine {
    *  rotation is never clamped in an immersive session. */
   private minPitchDeg: number = VERTICAL_LOOK_CONFIG.minPitchDeg;
   private maxPitchDeg: number = VERTICAL_LOOK_CONFIG.maxPitchDeg;
+
+  /** Active desktop look tween (Recenter, or the gentle pre-travel turn
+   *  toward a clicked navigation hotspot) — eased, never a snap. Cancelled
+   *  the moment the user takes manual control (drag). */
+  private lookTween: {
+    fromYaw: number;
+    fromPitch: number;
+    toYaw: number;
+    toPitch: number;
+    elapsed: number;
+    duration: number;
+  } | null = null;
 
   // Live-tunable view settings (debug panel). Defaults mirror VR_CONFIG's
   // production values; setDebug(true) reseeds them from DEBUG_VIEW_DEFAULTS.
@@ -228,6 +240,24 @@ export class VRSceneEngine {
     void this.sceneManager.showCustomPanorama(url, name);
   }
 
+  /** Warm a scene's texture ahead of navigation (floor selector hover, §9). */
+  preloadScene(sceneId: string): void {
+    const scene = getSceneById(sceneId);
+    if (scene) void this.textures.preloadPanorama(scene);
+  }
+
+  /**
+   * Recenter: ease the desktop look back to the current panorama's
+   * recommended starting orientation (its `initialCamera`, or straight
+   * ahead). Desktop-only — in an active WebXR session the headset's own
+   * tracked orientation is always authoritative.
+   */
+  recenterView(): void {
+    if (this.renderer.xr.isPresenting) return;
+    const o = this.sceneManager.currentScene?.initialCamera ?? { yaw: 0, pitch: 0 };
+    this.animateLookTo(o.yaw, o.pitch, 500);
+  }
+
   closeProductPanel(): void {
     if (this.panel.isOpen()) {
       const p = this.panel.product();
@@ -313,6 +343,41 @@ export class VRSceneEngine {
     const down = Math.max(this.minPitchDeg + halfFov, -this.pitchLimitDeg);
     const up = Math.min(this.maxPitchDeg, this.pitchLimitDeg);
     return THREE.MathUtils.clamp(deg, down, up);
+  }
+
+  /**
+   * Ease the desktop look toward an absolute yaw/pitch (deg) over `ms`,
+   * taking the shortest yaw direction. Used for Recenter and the gentle
+   * "orient toward destination" turn before a hotspot travel (§3) — never a
+   * snap. No-op in an active WebXR session (headset tracking is authoritative).
+   */
+  private animateLookTo(yawDeg: number, pitchDeg: number, ms: number): void {
+    if (this.renderer.xr.isPresenting) return;
+    const fromNorm = ((this.yaw % 360) + 360) % 360;
+    const toNorm = ((yawDeg % 360) + 360) % 360;
+    let delta = toNorm - fromNorm;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    this.lookTween = {
+      fromYaw: this.yaw,
+      fromPitch: this.pitch,
+      toYaw: this.yaw + delta,
+      toPitch: this.clampPitch(pitchDeg),
+      elapsed: 0,
+      duration: ms / 1000,
+    };
+  }
+
+  /** Advance the active look tween, if any. Desktop-only; see animateLookTo. */
+  private updateLookTween(dt: number): void {
+    const t = this.lookTween;
+    if (!t) return;
+    t.elapsed += dt;
+    const progress = Math.min(1, t.elapsed / t.duration);
+    const eased = easeInOutCubic(progress);
+    this.yaw = lerp(t.fromYaw, t.toYaw, eased);
+    this.pitch = this.clampPitch(lerp(t.fromPitch, t.toPitch, eased));
+    if (progress >= 1) this.lookTween = null;
   }
 
   /** Live-resize the panorama sphere (units) without reloading the scene. */
@@ -449,6 +514,7 @@ export class VRSceneEngine {
     if (this.renderer.xr.isPresenting) {
       this.updateControllerHover();
     } else {
+      if (!this.dragging) this.updateLookTween(dt);
       this.applyDesktopLook();
       this.updatePointerHover();
     }
@@ -515,6 +581,7 @@ export class VRSceneEngine {
 
   private onPointerDown = (e: PointerEvent) => {
     if (this.renderer.xr.isPresenting) return;
+    this.lookTween = null;
     this.dragging = true;
     this.pointerMoved = 0;
     this.pointerDown.set(e.clientX, e.clientY);
@@ -716,6 +783,10 @@ export class VRSceneEngine {
       });
       // Close any open panel before travelling.
       if (this.panel.isOpen()) this.closeProductPanel();
+      // Gently orient toward the destination (§3) — plays out while the
+      // scene fades to black, so it's felt but never blocks the transition.
+      const { yaw, pitch } = directionToYawPitch(h.position);
+      this.animateLookTo(yaw, pitch, 300);
       this.sceneManager.goTo(h.targetSceneId);
     } else {
       this.openProduct(h);
@@ -843,4 +914,25 @@ export class VRSceneEngine {
 
 function round(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/** Yaw/pitch (deg) the desktop camera should face to look directly at a
+ *  camera-relative world position, matching applyDesktopLook's YXZ Euler
+ *  convention (yaw 0 / pitch 0 looks toward -Z). */
+function directionToYawPitch(position: { x: number; y: number; z: number }): {
+  yaw: number;
+  pitch: number;
+} {
+  const dir = new THREE.Vector3(position.x, position.y, position.z).normalize();
+  const yaw = Math.atan2(-dir.x, -dir.z) / DEG2RAD;
+  const pitch = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)) / DEG2RAD;
+  return { yaw, pitch };
 }
