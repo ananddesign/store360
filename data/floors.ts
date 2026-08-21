@@ -78,6 +78,7 @@ export const floors: Record<string, FloorConfig> = {
         hotspots: [
           { target: 'entry', position: { x: -4.83, y: -1.5, z: 1.89 }, label: 'GROUND ENTRY VIEW' },
           { target: 'first-entry', position: { x: 4.68, y: -1.5, z: -2.57 }, label: 'GO TO FIRST FLOOR' },
+          { target: 'last', position: { x: 4.43, y: -1.5, z: 0.97 }, label: 'QWEEN CAFE VIEW' },
         ],
       },
       last: {
