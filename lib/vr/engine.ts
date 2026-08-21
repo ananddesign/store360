@@ -297,9 +297,20 @@ export class VRSceneEngine {
    * View / Pitch" limit can only tighten these symmetrically, never widen
    * them. Horizontal (yaw) is never touched → full 360° look is preserved.
    * MathUtils.clamp gives a smooth stop at the edge (no snap-back / jitter).
+   *
+   * Clamping the look *direction* alone isn't enough to satisfy "never see
+   * below minPitchDeg": the camera has a field of view, so once the crosshair
+   * reaches the raw limit, the *bottom edge* of the frame is already looking
+   * roughly halfFov further down than that — e.g. at a 70° FOV, a crosshair
+   * clamped to −55° still shows the frame's bottom edge at ≈−90°. So the
+   * downward bound is tightened by half the camera's (aspect-independent)
+   * vertical FOV, guaranteeing the visible frustum's lower edge never passes
+   * minPitchDeg. Upward keeps the plain crosshair limit (no complaint about
+   * over-seeing above +90, and half of it is past the zenith anyway).
    */
   private clampPitch(deg: number): number {
-    const down = Math.max(this.minPitchDeg, -this.pitchLimitDeg);
+    const halfFov = this.camera.fov / 2;
+    const down = Math.max(this.minPitchDeg + halfFov, -this.pitchLimitDeg);
     const up = Math.min(this.maxPitchDeg, this.pitchLimitDeg);
     return THREE.MathUtils.clamp(deg, down, up);
   }

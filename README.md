@@ -320,16 +320,26 @@ rotation is simply **hard-clamped** so you never reach it:
 
 - **Horizontal:** full, unrestricted 360° rotation, always. Yaw is never
   constrained.
-- **Vertical:** clamped to **−55° (down) … +90° (up)**. Look past an edge and
-  the camera just stops there — `MathUtils.clamp` on every look input, so it's
-  a smooth stop with no snap-back or jitter. Nothing else changes: no blur,
-  fade, overlay, or colour shift; the panorama renders exactly as before.
+- **Vertical:** clamped so the visible frame never shows past **−55° (down) …
+  +90° (up)**. Look past an edge and the camera just stops there —
+  `MathUtils.clamp` on every look input, so it's a smooth stop with no
+  snap-back or jitter. Nothing else changes: no blur, fade, overlay, or
+  colour shift; the panorama renders exactly as before.
+- **FOV-aware, not just crosshair-aware:** clamping the look *direction* to
+  −55° isn't enough on its own — the camera has a field of view, so with the
+  crosshair sitting at −55° the *bottom edge* of the frame is already looking
+  roughly another `fov/2` further down (at the default 70° FOV, that's most of
+  the way to straight down). So the downward bound is tightened by half the
+  camera's vertical FOV before being applied — at 70° FOV the crosshair caps
+  at **−20°**, which puts the frame's bottom edge exactly at −55°. Upward keeps
+  the plain crosshair limit at +90°.
 - **In VR:** head tracking is never clamped (it can't be, and clamping it would
   fight the headset) — this limit governs desktop drag/keyboard look.
 - **Configurable:** `VERTICAL_LOOK_CONFIG` in `lib/vr/config.ts`
   (`minPitchDeg` / `maxPitchDeg`) — the "minPolarAngle / maxPolarAngle
-  equivalent". The debug "Vertical View / Pitch" control can only *tighten*
-  this range symmetrically, never widen it.
+  equivalent", expressed as the *visible boundary*, not the raw crosshair
+  angle. The debug "Vertical View / Pitch" control can only *tighten* this
+  range symmetrically, never widen it.
 
 ## 10. Known limitations of V1
 
