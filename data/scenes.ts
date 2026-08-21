@@ -23,7 +23,10 @@ function buildScenes(): VRScene[] {
         type: 'navigation',
         label: h.label ?? 'Explore',
         targetSceneId: sceneIdFor(floorId, h.target),
-        position: h.position,
+        // Clone so each hotspot owns its position (floors.ts reuses shared
+        // FORWARD/BACKWARD constants) — lets the ?edit=true editor move one
+        // pad without shifting every other pad that shared the reference.
+        position: { x: h.position.x, y: h.position.y, z: h.position.z },
         // Every navigation hotspot renders as a flat floor pad by default;
         // a node may still opt back into the billboard diamond per-hotspot.
         style: h.style ?? 'floor',

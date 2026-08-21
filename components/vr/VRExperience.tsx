@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useVRStore } from '@/lib/vrStore';
-import { VRSceneEngine } from '@/lib/vr/engine';
+import { VRSceneEngine, type EditableHotspot } from '@/lib/vr/engine';
 import { detectXRSupport } from '@/lib/vr/webxr';
 import { trackEvent, flushSession } from '@/lib/vr/analytics';
 import { AmbientAudio } from '@/lib/vr/ambientAudio';
@@ -16,6 +16,7 @@ import {
 import { LoadingScreen } from './LoadingScreen';
 import { VRControls, type FloorOption } from './VRControls';
 import { DebugOverlay } from './DebugOverlay';
+import { HotspotEditor } from './HotspotEditor';
 import { PanoramaTester } from './PanoramaTester';
 import { ViewControlsPanel } from './ViewControlsPanel';
 
@@ -45,6 +46,8 @@ export function VRExperience() {
   const engineRef = useRef<VRSceneEngine | null>(null);
   const audioRef = useRef<AmbientAudio | null>(null);
   const [testMode, setTestMode] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editableHotspots, setEditableHotspots] = useState<EditableHotspot[]>([]);
 
   const {
     isReady,
@@ -74,6 +77,8 @@ export function VRExperience() {
     const debug = params.get('debug') === 'true';
     store.setDebugEnabled(debug);
     setTestMode(params.get('test') === 'true');
+    const edit = params.get('edit') === 'true';
+    setEditMode(edit);
 
     trackEvent('session_started', { initialScene });
 
@@ -94,10 +99,12 @@ export function VRExperience() {
       onProductClose: () => store.setProduct(null),
       onVRSessionChange: (active) => store.setVRMode(active),
       onDebugUpdate: (info) => store.setDebugInfo(info),
+      onEditableHotspots: (list) => setEditableHotspots(list),
       onEvent: (event, payload) => trackEvent(event as never, payload as never),
     });
     engineRef.current = engine;
     engine.setDebug(debug);
+    engine.setEditMode(edit);
     if (process.env.NODE_ENV !== 'production') {
       (window as unknown as { __vrEngine?: VRSceneEngine }).__vrEngine = engine;
     }
@@ -209,6 +216,14 @@ export function VRExperience() {
         <PanoramaTester
           activeSceneId={currentScene}
           onLoad={(url, name) => engineRef.current?.showPanoramaFromURL(url, name)}
+        />
+      )}
+
+      {editMode && !isVRMode && (
+        <HotspotEditor
+          hotspots={editableHotspots}
+          sceneName={sceneName}
+          currentSceneId={currentScene}
         />
       )}
 

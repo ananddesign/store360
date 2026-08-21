@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CameraOrientation, VRHotspot, VRScene } from '@/types/vr';
+import type { CameraOrientation, NavigationHotspot, VRHotspot, VRScene } from '@/types/vr';
 import { getProductById } from '@/data/products';
 import { DEFAULT_SCENE_ID, getSceneById } from '@/data/scenes';
 import { TextureManager } from './textureManager';
@@ -32,6 +32,16 @@ export interface DebugInfo {
   vrPitchLimitDeg: [number, number];
 }
 
+/** One navigation hotspot's editable state, surfaced to the desktop
+ *  drag editor (§?edit=true). Positions are camera-relative world units. */
+export interface EditableHotspot {
+  id: string;
+  sceneId: string;
+  targetSceneId: string;
+  style: 'floor' | 'billboard';
+  position: { x: number; y: number; z: number };
+}
+
 /** Current values of the live-tunable "View Controls" debug panel (§ViewControlsPanel). */
 export interface ViewTuning {
   eyeHeight: number;
@@ -51,6 +61,9 @@ export interface EngineCallbacks {
   onProductClose?: () => void;
   onVRSessionChange?: (active: boolean) => void;
   onDebugUpdate?: (info: DebugInfo) => void;
+  /** Desktop hotspot editor (§?edit=true): current scene's hotspots + live
+   *  positions, emitted on scene load and while dragging. */
+  onEditableHotspots?: (hotspots: EditableHotspot[]) => void;
   /** High-level analytics passthrough — engine reports what happened. */
   onEvent?: (event: string, payload?: Record<string, unknown>) => void;
 }
@@ -127,6 +140,12 @@ export class VRSceneEngine {
   private eyeHeightMeters: number = VR_CONFIG.playerHeight;
   private panoramaRadiusUnits: number = VR_CONFIG.panoramaRadius;
   private dragging = false;
+
+  /** Desktop hotspot editor (§?edit=true). While active, dragging a hotspot
+   *  repositions it instead of turning the view, and clicks never navigate. */
+  private editMode = false;
+  private editorDrag: { marker: THREE.Object3D; hotspot: NavigationHotspot } | null = null;
+
   private pointerDown = new THREE.Vector2();
   private lastPointer = new THREE.Vector2();
   private pointerMoved = 0;
@@ -208,6 +227,7 @@ export class VRSceneEngine {
           this.cb.onSceneChange?.(s);
           this.cb.onEvent?.('scene_viewed', { sceneId: s.id });
           if (this.debug) this.rebuildDebugGizmos(s);
+          if (this.editMode) this.emitEditable();
         },
         onTransitionStart: (from, to) => {
           this.cb.onTransitionStart?.(from, to);
@@ -320,6 +340,73 @@ export class VRSceneEngine {
     } else {
       this.viewControlsPanel3D.hide();
     }
+  }
+
+  /* ------------------------- hotspot editor (desktop) --------------------- */
+
+  /**
+   * Enable the desktop drag editor (§?edit=true). While on, pressing on a
+   * hotspot and dragging repositions it (floor pads slide across the floor
+   * plane; billboards swing around the view sphere at fixed distance) instead
+   * of turning the camera, and clicks never navigate. Desktop-only; no effect
+   * in an immersive session.
+   */
+  setEditMode(on: boolean): void {
+    this.editMode = on;
+    this.editorDrag = null;
+    this.setCursor(false);
+    if (on) this.emitEditable();
+  }
+
+  /** Current scene's navigation hotspots with their live (possibly edited)
+   *  positions, for the editor overlay. */
+  getEditableHotspots(): EditableHotspot[] {
+    const scene = this.sceneManager.currentScene;
+    if (!scene) return [];
+    return scene.hotspots
+      .filter((h): h is NavigationHotspot => h.type === 'navigation')
+      .map((h) => ({
+        id: h.id,
+        sceneId: scene.id,
+        targetSceneId: h.targetSceneId,
+        style: h.style ?? 'floor',
+        position: {
+          x: round(h.position.x),
+          y: round(h.position.y),
+          z: round(h.position.z),
+        },
+      }));
+  }
+
+  private emitEditable(): void {
+    this.cb.onEditableHotspots?.(this.getEditableHotspots());
+  }
+
+  /** Reposition the hotspot currently being dragged from the mouse ray. */
+  private dragEditorHotspot(): void {
+    const drag = this.editorDrag;
+    if (!drag) return;
+    this.raycaster.setFromCamera(this.hoverFromPointer, this.camera);
+    const ray = this.raycaster.ray;
+    const h = drag.hotspot;
+    const np = new THREE.Vector3();
+
+    if ((h.style ?? 'floor') === 'floor') {
+      // Slide across the floor plane (keep its current height y).
+      const y = h.position.y;
+      if (Math.abs(ray.direction.y) < 1e-5) return; // parallel to floor
+      const t = (y - ray.origin.y) / ray.direction.y;
+      if (t <= 0) return; // would land behind camera / above horizon
+      np.copy(ray.origin).addScaledVector(ray.direction, t);
+      np.y = y;
+    } else {
+      // Billboard: keep its distance, follow the ray direction on the sphere.
+      const dist = Math.hypot(h.position.x, h.position.y, h.position.z) || 4;
+      np.copy(ray.direction).normalize().multiplyScalar(dist);
+    }
+
+    this.hotspots.moveHotspotObject(drag.marker, { x: np.x, y: np.y, z: np.z });
+    this.emitEditable();
   }
 
   /* ---------------------------- view tuning (debug) ----------------------- */
@@ -655,7 +742,6 @@ export class VRSceneEngine {
   private onPointerDown = (e: PointerEvent) => {
     if (this.renderer.xr.isPresenting) return;
     this.lookTween = null;
-    this.dragging = true;
     this.pointerMoved = 0;
     this.pointerDown.set(e.clientX, e.clientY);
     this.lastPointer.set(e.clientX, e.clientY);
@@ -667,6 +753,20 @@ export class VRSceneEngine {
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
+
+    // Editor: pressing on a hotspot grabs it for dragging instead of turning
+    // the view. Anything else falls through to normal look-drag.
+    if (this.editMode) {
+      this.raycaster.setFromCamera(this.hoverFromPointer, this.camera);
+      const hit = this.hotspots.raycast(this.raycaster);
+      if (hit && hit.hotspot.type === 'navigation') {
+        this.editorDrag = { marker: hit.object, hotspot: hit.hotspot };
+        this.container.style.cursor = 'grabbing';
+        return;
+      }
+    }
+
+    this.dragging = true;
   };
 
   private onPointerMove = (e: PointerEvent) => {
@@ -676,6 +776,13 @@ export class VRSceneEngine {
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
+
+    // Editor: drag the grabbed hotspot to the mouse ray.
+    if (this.editorDrag) {
+      this.pointerMoved += 10;
+      this.dragEditorHotspot();
+      return;
+    }
 
     if (this.dragging) {
       const dx = e.clientX - this.lastPointer.x;
@@ -689,13 +796,23 @@ export class VRSceneEngine {
 
   private onPointerUp = (e: PointerEvent) => {
     if (this.renderer.xr.isPresenting) return;
+
+    // Editor: finish a hotspot drag (never navigates).
+    if (this.editorDrag) {
+      this.editorDrag = null;
+      this.container.style.cursor = 'grab';
+      this.emitEditable();
+      return;
+    }
+
     const wasClick =
       this.dragging &&
       this.pointerMoved < CLICK_MOVE_THRESHOLD &&
       Math.abs(e.clientX - this.pointerDown.x) < CLICK_MOVE_THRESHOLD &&
       Math.abs(e.clientY - this.pointerDown.y) < CLICK_MOVE_THRESHOLD;
     this.dragging = false;
-    if (wasClick) {
+    // In edit mode, clicks never navigate — the panorama is a placement canvas.
+    if (wasClick && !this.editMode) {
       this.raycaster.setFromCamera(this.hoverFromPointer, this.camera);
       this.performSelect();
     }
