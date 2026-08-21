@@ -424,8 +424,13 @@ function generateFloorsSnippet(): string {
       const style = h.style && h.style !== 'floor' ? `, style: '${h.style}'` : '';
       const name = h.label?.trim();
       const label = name && name !== 'Explore' ? `, label: '${name.replace(/'/g, "\\'")}'` : '';
+      // Keep the full "floor-node" id for cross-floor targets so the floor
+      // isn't lost on paste; use the bare node for same-floor targets.
+      const targetFloor = getFloorIdForScene(h.targetSceneId);
+      const target =
+        targetFloor && targetFloor !== floorId ? h.targetSceneId : targetNode(h.targetSceneId);
       out.push(
-        `{ target: '${targetNode(h.targetSceneId)}', position: { x: ${r(p.x)}, y: ${r(p.y)}, z: ${r(p.z)} }${label}${style} },`,
+        `{ target: '${target}', position: { x: ${r(p.x)}, y: ${r(p.y)}, z: ${r(p.z)} }${label}${style} },`,
       );
     }
   }
