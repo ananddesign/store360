@@ -71,7 +71,7 @@ export const floors: Record<string, FloorConfig> = {
       entry: {
         image: 'groundfloor-entry.jpg',
         initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle2', position: { x: 1.88, y: -1.5, z: 2.61 } }],
+        hotspots: [{ target: 'middle2', position: { x: 1.61, y: -1.5, z: 2.12 }, label: 'CENTER VIEW' }],
       },
       middle2: {
         image: 'groundfloor-middle2.jpg',
@@ -83,9 +83,8 @@ export const floors: Record<string, FloorConfig> = {
       last: {
         image: 'groundfloor-last.jpg',
         hotspots: [
-          { target: 'middle2', position: { x: 0.86, y: -1.5, z: -4.94 } },
-          { target: 'entry', position: { x: -1.79, y: -1.5, z: -8.56 } },
-          { target: 'entry', position: { x: 2.1, y: -1.5, z: 1.11 } },
+          { target: 'entry', position: { x: 2.32, y: -1.5, z: 1.07 }, label: 'GO TO FIRST FLOOR' },
+          { target: 'middle2', position: { x: -1.41, y: -1.5, z: -4.12 }, label: 'CENTER VIEW' },
         ],
       },
     },
