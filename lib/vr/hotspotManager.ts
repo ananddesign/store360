@@ -33,12 +33,29 @@ export class HotspotManager {
   private labelTextures = new Map<string, THREE.Texture>();
   private hovered: HotspotObject | null = null;
 
+  /** Editor mode (§?edit=true): labels show each hotspot's target scene and
+   *  stay visible (not hover-only) so you can tell which pad leads where. */
+  private editMode = false;
+
   constructor(
     private readonly textures: TextureManager,
     /** Resolve a product hotspot's display label (product name). */
     private readonly resolveLabel: (hotspot: VRHotspot) => string,
   ) {
     this.group.name = 'hotspots';
+  }
+
+  /** Toggle editor labelling. Rebuild the current scene's markers to relabel. */
+  setEditMode(on: boolean): void {
+    this.editMode = on;
+  }
+
+  /** Label text: in edit mode a nav hotspot shows its destination scene id. */
+  private labelFor(hotspot: VRHotspot): string {
+    if (this.editMode && hotspot.type === 'navigation') {
+      return `→ ${hotspot.targetSceneId}`;
+    }
+    return this.resolveLabel(hotspot);
   }
 
   /** Rebuild markers for a scene. Disposes the previous scene's markers. */
@@ -81,8 +98,9 @@ export class HotspotManager {
 
       // Labels reveal only on hover/tap — the marker itself is the minimal,
       // always-visible navigation cue (§2: "no large arrows or game-like UI").
+      // In edit mode they stay visible so every pad's destination is readable.
       const labelMat = obj.label.material as THREE.SpriteMaterial;
-      labelMat.opacity = obj.hover;
+      labelMat.opacity = this.editMode ? Math.max(0.85, obj.hover) : obj.hover;
       obj.label.visible = labelMat.opacity > 0.02;
     }
   }
@@ -169,7 +187,7 @@ export class HotspotManager {
     if (hotspot.type === 'navigation' && hotspot.style === 'floor') {
       const floor = new FloorHotspot({ position: pos, color: hotspot.color ?? FLOOR_COLOR });
       // Label floats above the pad so it stays readable off the ground.
-      const label = this.createLabel(this.resolveLabel(hotspot), pos, 1.0);
+      const label = this.createLabel(this.labelFor(hotspot), pos, 1.0);
       return { hotspot, marker: floor.hitMesh, floor, label, baseScale: 1, hover: 0 };
     }
 
@@ -191,7 +209,7 @@ export class HotspotManager {
         : VR_CONFIG.hotspot.productScale;
     sprite.scale.setScalar(baseScale);
 
-    const label = this.createLabel(this.resolveLabel(hotspot), pos, baseScale * 0.9);
+    const label = this.createLabel(this.labelFor(hotspot), pos, baseScale * 0.9);
     return { hotspot, marker: sprite, sprite, label, baseScale, hover: 0 };
   }
 
