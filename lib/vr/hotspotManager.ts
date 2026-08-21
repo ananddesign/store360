@@ -66,10 +66,10 @@ export class HotspotManager {
       const markerMat = obj.marker.material as THREE.SpriteMaterial;
       markerMat.opacity = 0.72 + obj.hover * 0.28;
 
-      // Labels: nav labels are faintly persistent; product labels appear on hover.
+      // Labels reveal only on hover/tap — the marker itself is the minimal,
+      // always-visible navigation cue (§2: "no large arrows or game-like UI").
       const labelMat = obj.label.material as THREE.SpriteMaterial;
-      const baseOpacity = obj.hotspot.type === 'navigation' ? 0.5 : 0;
-      labelMat.opacity = Math.max(baseOpacity, obj.hover);
+      labelMat.opacity = obj.hover;
       obj.label.visible = labelMat.opacity > 0.02;
     }
   }
