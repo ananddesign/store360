@@ -2,6 +2,19 @@ import type { NavigationHotspot, VRScene } from '@/types/vr';
 import { floors, floorOrder, sceneIdFor } from './floors';
 
 /**
+ * Resolve a hotspot's `target` to a full scene id. A bare node id (e.g.
+ * "entry") resolves within the hotspot's own floor; a fully-qualified id
+ * (e.g. "first-entry") is used as-is, enabling cross-floor navigation
+ * (e.g. a "Go to first floor" pad on the ground floor → first-entry).
+ */
+function resolveTargetSceneId(floorId: string, target: string): string {
+  for (const fid of floorOrder) {
+    if (target.startsWith(`${fid}-`)) return target;
+  }
+  return sceneIdFor(floorId, target);
+}
+
+/**
  * V1 scene graph — generated from the floor/node navigation config in
  * data/floors.ts. Each floor node becomes a VRScene; each configured
  * hotspot becomes a NavigationHotspot pointing at another node's scene id.
@@ -24,7 +37,7 @@ function buildScenes(): VRScene[] {
         id: `${id}-to-${h.target}-${i}`,
         type: 'navigation',
         label: h.label ?? 'Explore',
-        targetSceneId: sceneIdFor(floorId, h.target),
+        targetSceneId: resolveTargetSceneId(floorId, h.target),
         // Clone so each hotspot owns its position (floors.ts reuses shared
         // FORWARD/BACKWARD constants) — lets the ?edit=true editor move one
         // pad without shifting every other pad that shared the reference.
@@ -40,7 +53,7 @@ function buildScenes(): VRScene[] {
         environment: { type: 'panorama', source: `/vr/panoramas/${node.image}` },
         initialCamera: node.initialCamera,
         hotspots,
-        preload: node.hotspots.map((h) => sceneIdFor(floorId, h.target)),
+        preload: node.hotspots.map((h) => resolveTargetSceneId(floorId, h.target)),
       });
     }
   }
