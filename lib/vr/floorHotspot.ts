@@ -134,13 +134,13 @@ export class FloorHotspot {
     const partWave = 0.5 + 0.5 * Math.sin(ph + 1.2); // out of phase
     const h = THREE.MathUtils.clamp(hover, 0, 1);
 
-    // Ring: gentle 70%→100% opacity pulse, small extra lift on hover.
-    this.ringMat.opacity = Math.min(1, 0.7 + 0.3 * wave + 0.15 * h);
-    // Glow: expands slightly and fades back; brighter on hover.
-    this.glowMat.opacity = 0.28 + 0.14 * wave + 0.26 * h;
-    this.glow.scale.setScalar(1 + 0.06 * wave + 0.1 * h);
-    // Particles: extremely subtle opacity drift.
-    this.particlesMat.opacity = 0.42 + 0.2 * partWave + 0.15 * h;
+    // Ring: bright, gentle ~85%→100% opacity pulse, small extra lift on hover.
+    this.ringMat.opacity = Math.min(1, 0.86 + 0.14 * wave + 0.14 * h);
+    // Glow: expands slightly and fades back; strong bloom, brighter on hover.
+    this.glowMat.opacity = 0.55 + 0.25 * wave + 0.3 * h;
+    this.glow.scale.setScalar(1 + 0.07 * wave + 0.1 * h);
+    // Particles: bright dots with a subtle opacity drift.
+    this.particlesMat.opacity = 0.7 + 0.25 * partWave + 0.15 * h;
     // Whole pad scales ~1.05 on hover.
     this.group.scale.setScalar(1 + 0.05 * h);
   }
@@ -177,17 +177,23 @@ function createRingCanvas(color: string): HTMLCanvasElement {
 
   ctx.lineCap = 'round';
 
-  // Outer ring with a soft bloom.
-  ctx.shadowColor = hexA(color, 0.9);
-  ctx.shadowBlur = 14;
-  ctx.strokeStyle = hexA(color, 0.95);
-  ctx.lineWidth = 5;
+  // Outer ring with a strong bloom — drawn twice (bright core over a wide
+  // halo) so it reads luminous on a light showroom floor.
+  ctx.shadowColor = hexA(color, 1);
+  ctx.shadowBlur = 22;
+  ctx.strokeStyle = hexA(color, 0.85);
+  ctx.lineWidth = 8;
+  circle(ctx, c, c, R);
+  ctx.stroke();
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = hexA('#ffffff', 0.95);
+  ctx.lineWidth = 3;
   circle(ctx, c, c, R);
   ctx.stroke();
 
-  // Faint concentric inner ring — quiet refinement.
-  ctx.shadowBlur = 6;
-  ctx.strokeStyle = hexA(color, 0.35);
+  // Concentric inner ring — quiet refinement, a touch brighter now.
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = hexA(color, 0.5);
   ctx.lineWidth = 2;
   circle(ctx, c, c, R * 0.8);
   ctx.stroke();
@@ -250,9 +256,9 @@ function createGlowCanvas(color: string): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!;
   const c = S / 2;
   const g = ctx.createRadialGradient(c, c, S * 0.06, c, c, S * 0.5);
-  g.addColorStop(0, hexA(color, 0.1));
-  g.addColorStop(0.42, hexA(color, 0.4));
-  g.addColorStop(0.72, hexA(color, 0.12));
+  g.addColorStop(0, hexA(color, 0.18));
+  g.addColorStop(0.42, hexA(color, 0.7));
+  g.addColorStop(0.72, hexA(color, 0.22));
   g.addColorStop(1, hexA(color, 0));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, S, S);

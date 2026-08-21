@@ -19,12 +19,14 @@ function buildScenes(): VRScene[] {
     for (const [nodeId, node] of Object.entries(floor.nodes)) {
       const id = sceneIdFor(floorId, nodeId);
       const hotspots: NavigationHotspot[] = node.hotspots.map((h) => ({
-        id: `${id}-to-${h.target}${h.style === 'floor' ? '-floor' : ''}`,
+        id: `${id}-to-${h.target}`,
         type: 'navigation',
         label: h.label ?? 'Explore',
         targetSceneId: sceneIdFor(floorId, h.target),
         position: h.position,
-        ...(h.style ? { style: h.style } : {}),
+        // Every navigation hotspot renders as a flat floor pad by default;
+        // a node may still opt back into the billboard diamond per-hotspot.
+        style: h.style ?? 'floor',
         ...(h.color ? { color: h.color } : {}),
       }));
       scenes.push({

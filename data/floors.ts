@@ -55,15 +55,15 @@ export interface FloorConfig {
   nodes: Record<string, FloorNodeConfig>;
 }
 
-const FORWARD: Vec3 = { x: 0, y: -0.15, z: -4 };
-const BACKWARD: Vec3 = { x: 0, y: -0.15, z: 4 };
-
 /**
- * A floor-pad position: on the ground (y ≈ −eye height) a few metres ahead,
- * in the open floor area. The QWEEN floor projection lies flat here. Tune per
- * scene so it lands in front of / beneath the focal furniture, never over it.
+ * Floor-pad positions: on the ground (y ≈ −eye height), a few metres ahead of
+ * or behind the viewer, in the open floor area. Every navigation hotspot now
+ * renders as a flat QWEEN floor projection (style defaults to 'floor' in
+ * data/scenes.ts), so these sit low rather than at eye level. Tune per scene so
+ * a pad lands on open floor, never over furniture.
  */
-const FLOOR_AHEAD: Vec3 = { x: 0, y: -1.5, z: -3 };
+const FORWARD: Vec3 = { x: 0, y: -1.5, z: -3 };
+const BACKWARD: Vec3 = { x: 0, y: -1.5, z: 3 };
 
 export const floors: Record<string, FloorConfig> = {
   ground: {
@@ -111,14 +111,6 @@ export const floors: Record<string, FloorConfig> = {
         hotspots: [
           { target: 'entry', position: BACKWARD },
           { target: 'last', position: FORWARD },
-          // Premium floor projection on the open floor beneath the central
-          // podium — a flat, floor-anchored "explore" pad (§FloorHotspot).
-          {
-            target: 'last',
-            position: FLOOR_AHEAD,
-            style: 'floor',
-            label: 'Explore Floor',
-          },
         ],
       },
       last: {
