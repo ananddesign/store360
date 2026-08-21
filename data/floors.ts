@@ -76,8 +76,8 @@ export const floors: Record<string, FloorConfig> = {
       middle2: {
         image: 'groundfloor-middle2.jpg',
         hotspots: [
-          { target: 'entry', position: { x: -4.83, y: -1.5, z: 1.89 } },
-          { target: 'last', position: { x: 4.28, y: -1.5, z: -1.96 } },
+          { target: 'entry', position: { x: -4.83, y: -1.5, z: 1.89 }, label: 'GROUND ENTRY VIEW' },
+          { target: 'last', position: { x: 4.68, y: -1.5, z: -2.57 }, label: 'GO TO FIRST FLOOR' },
         ],
       },
       last: {
@@ -98,20 +98,20 @@ export const floors: Record<string, FloorConfig> = {
       entry: {
         image: 'firstfloor-entry.jpg',
         initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle', position: { x: 0.46, y: -1.5, z: 3.42 } }],
+        hotspots: [{ target: 'middle', position: { x: 0.46, y: -1.5, z: 3.42 }, label: 'CENTER VIEW' }],
       },
       middle: {
         image: 'firstfloor-middle.jpg',
         hotspots: [
           { target: 'entry', position: { x: 0.9, y: -1.5, z: 4.79 } },
-          { target: 'last', position: { x: -1.11, y: -1.5, z: -3.1 } },
+          { target: 'last', position: { x: -1.06, y: -1.5, z: -3.03 }, label: 'DIAMOND & GEM EXPERIENCE' },
         ],
       },
       last: {
         image: 'firstfloor-last.jpg',
         hotspots: [
-          { target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 } },
-          { target: 'entry', position: { x: 1.93, y: -1.5, z: 0.33 } },
+          { target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 }, label: 'CENTER VIEW' },
+          { target: 'entry', position: { x: 2.12, y: -1.5, z: 0.09 }, label: 'GROUND FLOOR' },
         ],
       },
     },
