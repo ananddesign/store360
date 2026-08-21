@@ -32,6 +32,9 @@ export class HotspotManager {
   private objects: HotspotObject[] = [];
   private labelTextures = new Map<string, THREE.Texture>();
   private hovered: HotspotObject | null = null;
+  /** B-button "focus" (no-aim selection). Highlighted like hover; the trigger
+   *  activates it when the ray isn't pointing at a pad. */
+  private focused: HotspotObject | null = null;
 
   /** Editor mode (§?edit=true): labels show each hotspot's target scene and
    *  stay visible (not hover-only) so you can tell which pad leads where. */
@@ -81,7 +84,7 @@ export class HotspotManager {
   /** Per-frame: subtle idle motion + hover interpolation. */
   update(elapsed: number): void {
     for (const obj of this.objects) {
-      const target = obj === this.hovered ? 1 : 0;
+      const target = obj === this.hovered || obj === this.focused ? 1 : 0;
       obj.hover += (target - obj.hover) * 0.18;
 
       if (obj.floor) {
@@ -136,6 +139,22 @@ export class HotspotManager {
 
   hoveredHotspot(): VRHotspot | null {
     return this.hovered?.hotspot ?? null;
+  }
+
+  /** Advance the B-button focus to the next hotspot (wraps). Returns it. */
+  focusNext(): VRHotspot | null {
+    if (this.objects.length === 0) {
+      this.focused = null;
+      return null;
+    }
+    const cur = this.focused ? this.objects.indexOf(this.focused) : -1;
+    this.focused = this.objects[(cur + 1) % this.objects.length]!;
+    return this.focused.hotspot;
+  }
+
+  /** The currently B-focused hotspot, if any. */
+  focusedHotspot(): VRHotspot | null {
+    return this.focused?.hotspot ?? null;
   }
 
   /**
@@ -207,6 +226,7 @@ export class HotspotManager {
     }
     this.objects = [];
     this.hovered = null;
+    this.focused = null;
   }
 
   dispose(): void {

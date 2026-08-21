@@ -163,6 +163,8 @@ export class VRSceneEngine {
   private controllers: THREE.Group[] = [];
   private controllerLines: THREE.Line[] = [];
   private activeController: THREE.Group | null = null;
+  /** Rising-edge tracking for the right-hand B button (hotspot focus hop). */
+  private bButtonPrev = false;
 
   // Timing / debug.
   private clock = new THREE.Clock();
@@ -739,6 +741,7 @@ export class VRSceneEngine {
       // headset pose is available (three updates the XR camera before this
       // callback) and before render(). Never touches the camera pose.
       this.applyVRPitchLock();
+      this.pollControllerButtons();
       this.updateControllerHover();
     } else {
       if (!this.dragging) this.updateLookTween(dt);
@@ -994,6 +997,35 @@ export class VRSceneEngine {
     }
   }
 
+  /**
+   * Poll the right-hand controller's B button each frame (WebXR has no button
+   * event, so we edge-detect `pressed`). B hops the "focus" to the next
+   * hotspot in the scene — a no-aim safety fallback for selecting a small
+   * floor pad: press B to step the highlight through the pads, then pull the
+   * trigger to travel to the focused one.
+   */
+  private pollControllerButtons(): void {
+    const session = this.renderer.xr.getSession();
+    if (!session) return;
+    let bPressed = false;
+    for (const src of session.inputSources) {
+      // buttons[5] = B (right hand) / Y (left hand) on the standard mapping.
+      if (src.handedness === 'right' && src.gamepad && src.gamepad.buttons[5]?.pressed) {
+        bPressed = true;
+      }
+    }
+    if (bPressed && !this.bButtonPrev) this.cycleHotspotFocus();
+    this.bButtonPrev = bPressed;
+  }
+
+  /** Advance the focused hotspot (highlight + label) to the next one. */
+  private cycleHotspotFocus(): void {
+    const focused = this.hotspots.focusNext();
+    if (focused) {
+      this.cb.onEvent?.('navigation_hotspot_focused', { hotspotId: focused.id });
+    }
+  }
+
   /* --------------------------- shared interaction ----------------------- */
 
   /**
@@ -1059,11 +1091,16 @@ export class VRSceneEngine {
       }
     }
 
-    // 3) Hotspots.
+    // 3) Hotspots. Prefer whatever the ray is pointing at; otherwise fall back
+    //    to the B-button-focused hotspot (no-aim selection, see cycleHotspotFocus).
     const hit = this.hotspots.raycast(this.raycaster);
-    if (!hit) return;
-    const h = hit.hotspot;
+    const h = hit?.hotspot ?? this.hotspots.focusedHotspot();
+    if (!h) return;
+    this.activateHotspot(h);
+  }
 
+  /** Travel to a navigation hotspot's target, or open a product hotspot. */
+  private activateHotspot(h: VRHotspot): void {
     if (h.type === 'navigation') {
       this.cb.onEvent?.('navigation_hotspot_clicked', {
         hotspotId: h.id,
