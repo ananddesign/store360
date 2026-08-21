@@ -68,31 +68,33 @@ export class NadirBlur {
         uniform float uLimit;
         uniform float uBlur;
 
-        // sRGB → linear so this matches the panorama's MeshBasicMaterial, which
-        // three auto-decodes; the renderer re-encodes our linear output on write.
-        vec3 toLinear(vec3 c) {
-          return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
-        }
-
         void main() {
           float elevation = asin(clamp(vDir.y, -1.0, 1.0));
           // 0 above fadeStart, eased up to 1 at/below the limit.
           float t = 1.0 - smoothstep(uLimit, uFadeStart, elevation);
           if (t <= 0.002) discard; // skip the whole upper sphere — no blur cost
 
+          // Average the texture's raw (sRGB-encoded) samples and write them
+          // straight out — NO colour-space decode/encode. This is deliberate:
+          // the panorama's MeshBasicMaterial round-trips sRGB→linear→sRGB, so
+          // its on-screen pixel equals the raw texel; emitting the same raw
+          // values (just blurred) matches its brightness/colour exactly. So
+          // this is a pure defocus — no darkening, no tint, no overlay. (A
+          // box mean preserves average brightness; only local contrast softens,
+          // which is what "frosted glass" is.)
+          //
           // Two rings of taps → a smooth frosted defocus. u is halved to keep
           // the kernel roughly circular in world space on a 2:1 equirect map.
-          vec3 acc = toLinear(texture2D(uMap, vUv).rgb);
+          vec3 acc = texture2D(uMap, vUv).rgb;
           float wsum = 1.0;
           for (int i = 0; i < 8; i++) {
             float a = (float(i) / 8.0) * 6.2831853;
             vec2 dir = vec2(cos(a) * 0.5, sin(a));
-            acc += toLinear(texture2D(uMap, vUv + dir * uBlur).rgb);
-            acc += toLinear(texture2D(uMap, vUv + dir * uBlur * 0.5).rgb);
+            acc += texture2D(uMap, vUv + dir * uBlur).rgb;
+            acc += texture2D(uMap, vUv + dir * uBlur * 0.5).rgb;
             wsum += 2.0;
           }
-          vec3 col = acc / wsum;
-          gl_FragColor = vec4(col, t);
+          gl_FragColor = vec4(acc / wsum, t);
         }
       `,
     });
