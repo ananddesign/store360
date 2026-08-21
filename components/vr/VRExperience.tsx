@@ -224,6 +224,7 @@ export function VRExperience() {
           hotspots={editableHotspots}
           sceneName={sceneName}
           currentSceneId={currentScene}
+          onGoToScene={(id) => engineRef.current?.goToScene(id)}
         />
       )}
 

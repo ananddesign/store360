@@ -10,6 +10,8 @@ interface HotspotEditorProps {
   hotspots: EditableHotspot[];
   sceneName: string | null;
   currentSceneId: string | null;
+  /** Jump to any scene (so every scene's pads can be edited). */
+  onGoToScene: (sceneId: string) => void;
 }
 
 /**
@@ -20,7 +22,12 @@ interface HotspotEditorProps {
  * scene data as you drag; this panel mirrors the live positions and generates a
  * `data/floors.ts`-ready snippet to copy back (runtime edits aren't persisted).
  */
-export function HotspotEditor({ hotspots, sceneName, currentSceneId }: HotspotEditorProps) {
+export function HotspotEditor({
+  hotspots,
+  sceneName,
+  currentSceneId,
+  onGoToScene,
+}: HotspotEditorProps) {
   const [copied, setCopied] = useState(false);
 
   const exportText = generateFloorsSnippet();
@@ -50,13 +57,45 @@ export function HotspotEditor({ hotspots, sceneName, currentSceneId }: HotspotEd
       </div>
 
       <div className="mt-1 border-t border-white/10 pt-1">
+        <div className="mb-1 text-qween-mist">hotspots here (click → to open its view):</div>
         {hotspots.length === 0 && <div className="text-qween-mist">no hotspots here</div>}
         {hotspots.map((h) => (
           <div key={h.id} className="flex items-baseline justify-between gap-2 py-0.5">
-            <span className="text-qween-gold-soft">→ {targetNode(h.targetSceneId)}</span>
-            <span className="text-qween-mist">
+            <button
+              onClick={() => onGoToScene(h.targetSceneId)}
+              title={`Open ${h.targetSceneId}`}
+              className="text-left text-qween-gold-soft underline decoration-dotted underline-offset-2 hover:text-qween-diamond"
+            >
+              → {h.targetSceneId}
+            </button>
+            <span className="shrink-0 text-qween-mist">
               {fmt(h.position.x)}, {fmt(h.position.y)}, {fmt(h.position.z)}
             </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Jump to any scene so every scene's pads can be edited. */}
+      <div className="mt-2 border-t border-white/10 pt-1">
+        <div className="mb-1 text-qween-mist">go to scene:</div>
+        {sceneGroups.map(({ floorId, ids }) => (
+          <div key={floorId} className="mb-1">
+            <div className="text-[10px] uppercase tracking-widest text-qween-mist">{floorId}</div>
+            <div className="flex flex-wrap gap-1">
+              {ids.map((id) => (
+                <button
+                  key={id}
+                  onClick={() => onGoToScene(id)}
+                  className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
+                    id === currentSceneId
+                      ? 'border-qween-gold bg-qween-gold/80 text-qween-void'
+                      : 'border-qween-line text-qween-diamond hover:bg-white/10'
+                  }`}
+                >
+                  {nodeOf(id, floorId)}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -76,6 +115,26 @@ export function HotspotEditor({ hotspots, sceneName, currentSceneId }: HotspotEd
       </pre>
     </div>
   );
+}
+
+/** All scenes grouped by floor, in graph order — for the "go to scene" list. */
+const sceneGroups: { floorId: string; ids: string[] }[] = (() => {
+  const groups: { floorId: string; ids: string[] }[] = [];
+  for (const s of scenes) {
+    const floorId = getFloorIdForScene(s.id) ?? 'other';
+    let g = groups.find((x) => x.floorId === floorId);
+    if (!g) {
+      g = { floorId, ids: [] };
+      groups.push(g);
+    }
+    g.ids.push(s.id);
+  }
+  return groups;
+})();
+
+/** Bare node name of a scene id within its floor (e.g. "ground-middle2" → "middle2"). */
+function nodeOf(sceneId: string, floorId: string): string {
+  return sceneId.startsWith(`${floorId}-`) ? sceneId.slice(floorId.length + 1) : sceneId;
 }
 
 /** Strip the floor prefix from a scene id → the bare node name. */

@@ -355,6 +355,12 @@ export class VRSceneEngine {
     this.editMode = on;
     this.editorDrag = null;
     this.setCursor(false);
+    this.hotspots.setEditMode(on);
+    // Relabel the current scene's pads with their destinations (or restore the
+    // normal labels when leaving edit mode).
+    if (this.sceneManager.currentScene) {
+      this.hotspots.setScene(this.sceneManager.currentScene);
+    }
     if (on) this.emitEditable();
   }
 
