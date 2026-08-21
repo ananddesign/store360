@@ -96,13 +96,16 @@ export const floors: Record<string, FloorConfig> = {
     nodes: {
       entry: {
         image: 'firstfloor-entry.jpg',
-        initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle', position: { x: 0.46, y: -1.5, z: 3.42 }, label: 'CENTER VIEW' }],
+        initialCamera: { yaw: 180, pitch: -3 },
+        hotspots: [
+          { target: 'middle', position: { x: 0.46, y: -1.5, z: 3.42 }, label: 'CENTER VIEW' },
+          { target: 'ground-entry', position: { x: 0.06, y: -1.5, z: -2.16 }, label: 'GO TO GROUND FLOOR' },
+        ],
       },
       middle: {
         image: 'firstfloor-middle.jpg',
         hotspots: [
-          { target: 'entry', position: { x: 0.9, y: -1.5, z: 4.79 } },
+          { target: 'entry', position: { x: 0.82, y: -1.5, z: 4.98 }, label: 'FIRST FLOOR ENTRY' },
           { target: 'last', position: { x: -1.06, y: -1.5, z: -3.03 }, label: 'DIAMOND & GEM EXPERIENCE' },
         ],
       },
@@ -110,7 +113,7 @@ export const floors: Record<string, FloorConfig> = {
         image: 'firstfloor-last.jpg',
         hotspots: [
           { target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 }, label: 'CENTER VIEW' },
-          { target: 'entry', position: { x: 2.12, y: -1.5, z: 0.09 }, label: 'GROUND FLOOR' },
+          { target: 'ground-entry', position: { x: 2.29, y: -1.5, z: 0.05 }, label: 'GO TO GROUND FLOOR' },
         ],
       },
     },
