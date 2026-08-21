@@ -54,9 +54,15 @@ export class NadirBlur {
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         map: { value: null },
-        blurRadius: { value: 0.004 }, // in equirect UV units
+        blurRadius: { value: 0.006 }, // in equirect UV units
         fadeStartY: { value: Math.sin(fadeStartDeg * DEG2RAD) },
         fadeEndY: { value: Math.sin(limitDeg * DEG2RAD) },
+        // How far the blurred floor is lifted toward white (0 = raw floor,
+        // 1 = pure white). Keeps the treatment a soft, bright frost rather
+        // than a muddy grey smear.
+        whiteness: { value: 0.78 },
+        // Peak opacity of the frost at the nadir.
+        maxAlpha: { value: 0.9 },
       },
       transparent: true,
       depthTest: false,
@@ -77,6 +83,8 @@ export class NadirBlur {
         uniform float blurRadius;
         uniform float fadeStartY;
         uniform float fadeEndY;
+        uniform float whiteness;
+        uniform float maxAlpha;
         varying vec3 vDir;
 
         const float PI = 3.141592653589793;
@@ -92,20 +100,28 @@ export class NadirBlur {
           vec3 d = normalize(vDir);
           vec2 uv = dirToUv(d);
 
-          // Small multi-tap box blur in UV space. Widen taps toward the poles
-          // where equirect UVs compress horizontally, so the blur stays even.
-          float horiz = blurRadius / max(0.15, sqrt(1.0 - d.y * d.y));
+          // Gaussian-weighted 7x7 blur in UV space. The horizontal step is only
+          // gently widened toward the pole and hard-capped, so the taps never
+          // fan out into the patchy smear the old box blur produced.
+          float horiz = blurRadius * clamp(1.0 / sqrt(1.0 - d.y * d.y), 1.0, 2.5);
           vec3 sum = vec3(0.0);
-          for (int i = -2; i <= 2; i++) {
-            for (int j = -2; j <= 2; j++) {
+          float wsum = 0.0;
+          for (int i = -3; i <= 3; i++) {
+            for (int j = -3; j <= 3; j++) {
+              float w = exp(-(float(i * i + j * j)) / 8.0); // gaussian falloff
               vec2 o = vec2(float(i) * horiz, float(j) * blurRadius);
-              sum += texture2D(map, uv + o).rgb;
+              sum += texture2D(map, uv + o).rgb * w;
+              wsum += w;
             }
           }
-          vec3 col = sum / 25.0;
+          vec3 blurred = sum / wsum;
 
-          // Fade the blur in as the fragment drops from fadeStartY → fadeEndY.
-          float a = smoothstep(fadeStartY, fadeEndY, d.y);
+          // Lift toward white so the floor reads as a soft, bright frost rather
+          // than a grey smear.
+          vec3 col = mix(blurred, vec3(1.0), whiteness);
+
+          // Fade the frost in as the fragment drops from fadeStartY → fadeEndY.
+          float a = smoothstep(fadeStartY, fadeEndY, d.y) * maxAlpha;
           if (a < 0.004) discard;
           gl_FragColor = vec4(col, a);
         }
