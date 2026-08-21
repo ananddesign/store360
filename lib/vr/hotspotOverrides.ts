@@ -18,6 +18,8 @@ export interface SavedHotspot {
   targetSceneId: string;
   position: Vec3;
   style: 'floor' | 'billboard';
+  /** Custom display name shown on the pad. */
+  label?: string;
 }
 
 /** sceneId → its navigation hotspots. */

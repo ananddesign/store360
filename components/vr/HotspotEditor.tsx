@@ -34,6 +34,8 @@ interface HotspotEditorProps {
   onRemoveHotspot: (id: string) => void;
   /** Reassign a hotspot's destination scene. */
   onSetTarget: (id: string, targetSceneId: string) => void;
+  /** Rename a hotspot (the small label shown on the pad). */
+  onSetLabel: (id: string, label: string) => void;
 }
 
 const STEPS = [0.1, 0.25, 0.5, 1] as const;
@@ -60,6 +62,7 @@ export function HotspotEditor({
   onAddHotspot,
   onRemoveHotspot,
   onSetTarget,
+  onSetLabel,
 }: HotspotEditorProps) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -93,6 +96,7 @@ export function HotspotEditor({
         targetSceneId: h.type === 'navigation' ? h.targetSceneId : '',
         position: { x: r(h.position.x), y: r(h.position.y), z: r(h.position.z) },
         style: (h.type === 'navigation' && h.style) || 'floor',
+        label: (h.type === 'navigation' && h.label) || 'Explore',
       }));
     }
     saveHotspotOverrides(map);
@@ -184,6 +188,12 @@ export function HotspotEditor({
                   ✕
                 </button>
               </div>
+
+              {/* Name — shown subtly on the pad in-scene. */}
+              <NameRow
+                value={h.label}
+                onSet={(v) => onSetLabel(h.id, v)}
+              />
 
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <AxisRow
@@ -279,6 +289,37 @@ export function HotspotEditor({
       <pre className="mt-2 max-h-[32vh] select-text overflow-auto rounded border border-white/10 bg-black/60 p-2 text-[10px] leading-snug text-qween-mist">
         {exportText}
       </pre>
+    </div>
+  );
+}
+
+/** Name row: a text field committing on blur / Enter. */
+function NameRow({ value, onSet }: { value: string; onSet: (v: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const v = draft.trim();
+    if (v) onSet(v);
+    setDraft(null);
+  };
+  return (
+    <div className="mb-1 flex items-center gap-1.5">
+      <span className="w-8 shrink-0 text-qween-mist">name</span>
+      <input
+        value={draft ?? value}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => {
+          setDraft(value);
+          e.currentTarget.select();
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setDraft(null);
+        }}
+        placeholder="Explore"
+        className="min-w-0 flex-1 rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-qween-diamond outline-none focus:border-qween-gold/60"
+      />
     </div>
   );
 }
@@ -381,8 +422,10 @@ function generateFloorsSnippet(): string {
       if (h.type !== 'navigation') continue;
       const p = h.position;
       const style = h.style && h.style !== 'floor' ? `, style: '${h.style}'` : '';
+      const name = h.label?.trim();
+      const label = name && name !== 'Explore' ? `, label: '${name.replace(/'/g, "\\'")}'` : '';
       out.push(
-        `{ target: '${targetNode(h.targetSceneId)}', position: { x: ${r(p.x)}, y: ${r(p.y)}, z: ${r(p.z)} }${style} },`,
+        `{ target: '${targetNode(h.targetSceneId)}', position: { x: ${r(p.x)}, y: ${r(p.y)}, z: ${r(p.z)} }${label}${style} },`,
       );
     }
   }
