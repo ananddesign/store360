@@ -8,6 +8,7 @@ import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
 import { ViewControlsPanel3D, type ViewControlAction } from './viewControlsPanel3D';
 import { NadirBlur } from './nadirBlur';
+import { loadHotspotOverrides } from './hotspotOverrides';
 import {
   VR_CONFIG,
   DEG2RAD,
@@ -149,6 +150,8 @@ export class VRSceneEngine {
    *  repositions it instead of turning the view, and clicks never navigate. */
   private editMode = false;
   private editorDrag: { marker: THREE.Object3D; hotspot: NavigationHotspot } | null = null;
+  /** Monotonic counter for generating unique ids for editor-created hotspots. */
+  private hotspotSeq = 0;
 
   private pointerDown = new THREE.Vector2();
   private lastPointer = new THREE.Vector2();
@@ -231,6 +234,7 @@ export class VRSceneEngine {
       this.hotspots,
       {
         onSceneViewed: (s) => {
+          this.applyHotspotOverrides(s);
           this.cb.onSceneChange?.(s);
           this.cb.onEvent?.('scene_viewed', { sceneId: s.id });
           this.nadirBlur.setTexture(this.sceneManager.currentTexture);
@@ -395,6 +399,65 @@ export class VRSceneEngine {
 
   private emitEditable(): void {
     this.cb.onEditableHotspots?.(this.getEditableHotspots());
+  }
+
+  /** Apply any locally-saved hotspot edits (moves, adds, removes, retargets)
+   *  to a freshly-loaded scene, so editor work survives reloads until baked
+   *  into data/floors.ts. A saved scene fully replaces its config-defined
+   *  navigation pads; product hotspots are left untouched. */
+  private applyHotspotOverrides(scene: VRScene): void {
+    const saved = loadHotspotOverrides()[scene.id];
+    if (!saved || saved.length === 0) return;
+    const nonNav = scene.hotspots.filter((h) => h.type !== 'navigation');
+    const navs: NavigationHotspot[] = saved.map((s) => ({
+      id: `${scene.id}-nav-${this.hotspotSeq++}`,
+      type: 'navigation',
+      label: 'Explore',
+      targetSceneId: s.targetSceneId,
+      position: { x: s.position.x, y: s.position.y, z: s.position.z },
+      style: s.style,
+    }));
+    scene.hotspots = [...navs, ...nonNav];
+    this.hotspots.setScene(scene);
+  }
+
+  /** Editor: add a new navigation hotspot to the current scene, pointing at
+   *  `targetSceneId`. Appears as a floor pad in front of the viewer, ready to
+   *  drag / nudge into place. */
+  addHotspot(targetSceneId: string): void {
+    const scene = this.sceneManager.currentScene;
+    if (!scene) return;
+    const h: NavigationHotspot = {
+      id: `${scene.id}-nav-${this.hotspotSeq++}`,
+      type: 'navigation',
+      label: 'Explore',
+      targetSceneId,
+      position: { x: 0, y: -1.5, z: -3 },
+      style: 'floor',
+    };
+    scene.hotspots = [...scene.hotspots, h];
+    this.hotspots.setScene(scene);
+    this.emitEditable();
+  }
+
+  /** Editor: remove a hotspot from the current scene by id. */
+  removeHotspot(id: string): void {
+    const scene = this.sceneManager.currentScene;
+    if (!scene) return;
+    scene.hotspots = scene.hotspots.filter((h) => h.id !== id);
+    this.hotspots.setScene(scene);
+    this.emitEditable();
+  }
+
+  /** Editor: reassign a hotspot's destination scene. */
+  setHotspotTarget(id: string, targetSceneId: string): void {
+    const scene = this.sceneManager.currentScene;
+    if (!scene) return;
+    const h = scene.hotspots.find((x) => x.id === id);
+    if (!h || h.type !== 'navigation') return;
+    h.targetSceneId = targetSceneId;
+    this.hotspots.setScene(scene); // relabel the pad with its new destination
+    this.emitEditable();
   }
 
   /** Editor: set a hotspot's exact position by id (numeric controls). */

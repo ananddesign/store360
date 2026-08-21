@@ -181,6 +181,13 @@ export function VRExperience() {
     engineRef.current?.recenterView();
   };
 
+  /** Toggle the hotspot placement editor from the chrome (no ?edit=true needed). */
+  const handleToggleEdit = () => {
+    const next = !editMode;
+    setEditMode(next);
+    engineRef.current?.setEditMode(next);
+  };
+
   const sceneName = currentScene
     ? currentScene.startsWith('custom:')
       ? currentScene.slice('custom:'.length)
@@ -201,12 +208,14 @@ export function VRExperience() {
         isProductPanelOpen={isProductPanelOpen}
         isMuted={isMuted}
         debugEnabled={debugEnabled}
+        editEnabled={editMode}
         floors={FLOOR_OPTIONS}
         activeFloorId={currentScene ? getFloorIdForScene(currentScene) : null}
         onEnterVR={handleEnterVR}
         onCloseProduct={handleCloseProduct}
         onToggleMute={handleToggleMute}
         onToggleDebug={handleToggleDebug}
+        onToggleEdit={handleToggleEdit}
         onSelectFloor={handleSelectFloor}
         onPreloadFloor={handlePreloadFloor}
         onRecenter={handleRecenter}
@@ -227,6 +236,9 @@ export function VRExperience() {
           onGoToScene={(id) => engineRef.current?.goToScene(id)}
           onNudge={(id, axis, delta) => engineRef.current?.nudgeHotspot(id, axis, delta)}
           onSetPosition={(id, pos) => engineRef.current?.setHotspotPosition(id, pos)}
+          onAddHotspot={(targetSceneId) => engineRef.current?.addHotspot(targetSceneId)}
+          onRemoveHotspot={(id) => engineRef.current?.removeHotspot(id)}
+          onSetTarget={(id, targetSceneId) => engineRef.current?.setHotspotTarget(id, targetSceneId)}
         />
       )}
 
