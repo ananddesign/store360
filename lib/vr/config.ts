@@ -91,19 +91,22 @@ export const DEBUG_VIEW_VR_STEPS = {
 } as const;
 
 /**
- * Always-on "hide the nadir" mask (lib/vr/nadirMask.ts) — softly obscures the
- * extreme downward view, where a tripod mount or a stitching seam commonly
- * ruins 360° photography. Independent of the desktop pitch-look clamp
- * (`maxPitchDeg` / the View Controls pitch limit): it never touches camera
- * rotation — it can't, for a headset, since head tracking is authoritative —
- * it only renders an increasingly opaque overlay as the gaze direction
- * approaches `limitDeg`. Full 360° horizontal look is completely unaffected.
+ * Downward "frosted blur" of the nadir (lib/vr/nadirBlur.ts) — softly
+ * defocuses the extreme downward view, where a tripod mount or a stitching
+ * seam commonly ruins 360° photography, while keeping the environment visible
+ * (no black hole / vignette). Two roles, both configurable here:
+ *  - `limitDeg` also caps how far *down* the desktop camera can rotate
+ *    (VRSceneEngine clamps pitch to it). Horizontal 360° is never affected,
+ *    and upward look keeps its own (larger) limit.
+ *  - `fadeStartDeg`..`limitDeg` is the elevation band over which the blur eases
+ *    in (subtle at fadeStart → fully frosted at the limit).
  */
-export const NADIR_MASK_CONFIG = {
-  /** Elevation (deg, negative = downward) where the fade begins. */
+export const NADIR_BLUR_CONFIG = {
+  /** Elevation (deg, negative = downward) where the blur begins to ease in. */
   fadeStartDeg: -45,
-  /** Elevation (deg, negative = downward) beyond which the view is fully masked. */
+  /** Elevation (deg, negative = downward): full blur, and the desktop
+   *  downward-look hard stop. */
   limitDeg: -55,
-  /** Mask colour — matches the QWEEN void background. */
-  color: 0x0a0a0b,
+  /** Blur kernel radius in equirectangular UV space (larger = softer). */
+  blurRadius: 0.006,
 } as const;

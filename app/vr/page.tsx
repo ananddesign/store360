@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { QweenWordmark } from '@/components/QweenWordmark';
 
 /**
  * The immersive route (§25).
@@ -21,7 +22,7 @@ const VRExperience = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-full w-full items-center justify-center bg-qween-void">
-        <div className="font-display text-5xl font-light text-qween-gold-soft">Q</div>
+        <QweenWordmark className="h-8 w-auto text-qween-gold-soft" />
       </div>
     ),
   },

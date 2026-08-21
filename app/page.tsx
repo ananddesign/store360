@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import { QweenWordmark } from '@/components/QweenWordmark';
 
 /**
- * Landing → Enter QWEEN Store (§1). Deliberately quiet: monogram, one line of
- * intent, a single call to action into the immersive experience.
+ * Landing → Enter QWEEN Store (§1). Deliberately quiet: the QWEEN wordmark, one
+ * line of intent, a single call to action into the immersive experience.
  */
 export default function Landing() {
   return (
@@ -17,11 +18,9 @@ export default function Landing() {
       />
 
       <div className="relative flex flex-col items-center">
-        <div className="font-display text-7xl font-light text-qween-gold-soft">Q</div>
-        <h1 className="mt-6 font-sans text-xs uppercase tracking-brand text-qween-diamond/85">
-          QWEEN
-        </h1>
-        <p className="mt-6 max-w-md font-display text-2xl font-light leading-relaxed text-qween-diamond">
+        <h1 className="sr-only">QWEEN</h1>
+        <QweenWordmark className="h-11 w-auto text-qween-gold-soft" />
+        <p className="mt-8 max-w-md font-display text-2xl font-light leading-relaxed text-qween-diamond">
           A spatial jewellery showroom, crafted for Meta Quest and the web.
         </p>
 

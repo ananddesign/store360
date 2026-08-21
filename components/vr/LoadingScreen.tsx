@@ -1,5 +1,7 @@
 'use client';
 
+import { QweenWordmark } from '@/components/QweenWordmark';
+
 interface LoadingScreenProps {
   /** 0–1; when omitted the bar shows an indeterminate shimmer. */
   progress?: number;
@@ -21,9 +23,7 @@ export function LoadingScreen({ progress, visible }: LoadingScreenProps) {
       aria-hidden={!visible}
     >
       <div className="flex flex-col items-center">
-        <div className="font-display text-6xl font-light text-qween-gold-soft animate-shimmer">
-          Q
-        </div>
+        <QweenWordmark className="h-9 w-auto text-qween-gold-soft animate-shimmer" />
         <div className="mt-6 font-sans text-xs uppercase tracking-brand text-qween-diamond/80">
           Entering QWEEN
         </div>

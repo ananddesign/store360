@@ -3,7 +3,8 @@ import type { CameraOrientation, VRScene } from '@/types/vr';
 import { getSceneById } from '@/data/scenes';
 import type { TextureManager } from './textureManager';
 import type { HotspotManager } from './hotspotManager';
-import { VR_CONFIG } from './config';
+import { NadirBlur } from './nadirBlur';
+import { VR_CONFIG, NADIR_BLUR_CONFIG } from './config';
 
 interface SceneManagerCallbacks {
   onSceneViewed: (scene: VRScene) => void;
@@ -22,6 +23,7 @@ interface SceneManagerCallbacks {
  */
 export class SceneManager {
   private panorama: THREE.Mesh;
+  private nadirBlur: NadirBlur;
   private fade: THREE.Mesh;
   private fadeValue = 1; // start black; first load fades in.
   private fadeTarget = 1;
@@ -46,6 +48,15 @@ export class SceneManager {
     this.panorama = new THREE.Mesh(geo, mat);
     this.panorama.name = 'panorama';
     this.root.add(this.panorama);
+
+    // Downward frosted-blur cap — shares this sphere's texture + radius.
+    this.nadirBlur = new NadirBlur(
+      VR_CONFIG.panoramaRadius,
+      NADIR_BLUR_CONFIG.fadeStartDeg,
+      NADIR_BLUR_CONFIG.limitDeg,
+      NADIR_BLUR_CONFIG.blurRadius,
+    );
+    this.root.add(this.nadirBlur.mesh);
 
     // Camera-attached fade sphere.
     const fadeGeo = new THREE.SphereGeometry(5, 16, 12);
@@ -134,6 +145,7 @@ export class SceneManager {
     const mat = this.panorama.material as THREE.MeshBasicMaterial;
     mat.map = texture;
     mat.needsUpdate = true;
+    this.nadirBlur.setTexture(texture);
     this.hotspots.setScene(scene);
 
     this.previous = this.current;
@@ -184,6 +196,7 @@ export class SceneManager {
     const mat = this.panorama.material as THREE.MeshBasicMaterial;
     mat.map = texture;
     mat.needsUpdate = true;
+    this.nadirBlur.setTexture(texture);
     this.hotspots.setScene(synthetic); // clears markers
 
     this.previous = this.current;
@@ -200,12 +213,16 @@ export class SceneManager {
    * (no geometry rebuild, no texture reload, no scene disruption).
    */
   setRadius(radius: number): void {
-    this.panorama.scale.setScalar(radius / VR_CONFIG.panoramaRadius);
+    const scale = radius / VR_CONFIG.panoramaRadius;
+    this.panorama.scale.setScalar(scale);
+    this.nadirBlur.setRadiusScale(scale);
   }
 
   dispose(): void {
     this.panorama.geometry.dispose();
     (this.panorama.material as THREE.MeshBasicMaterial).dispose();
+    this.nadirBlur.dispose();
+    this.nadirBlur.mesh.removeFromParent();
     this.fade.geometry.dispose();
     (this.fade.material as THREE.MeshBasicMaterial).dispose();
     this.fade.removeFromParent();

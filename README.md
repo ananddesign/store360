@@ -82,6 +82,7 @@ lib/
     hotspotManager.ts   Hotspot markers, labels, hover, raycast
     productPanel.ts     Spatial 3D product panel
     viewControlsPanel3D.ts  In-headset 3D View Controls (tap +/- steppers)
+    nadirBlur.ts        Downward frosted-blur cap (hides tripod/seam nadir)
     nadirMask.ts        Soft always-on mask hiding the extreme downward view
     textureManager.ts   Panorama load/preload/dispose (§17)
     placeholder.ts      Procedural placeholder panoramas/products/markers
@@ -317,6 +318,31 @@ replace `getProductById`) — nothing downstream changes.
 
 The build is a standard `next build` (verified). `outputFileTracingRoot` is
 pinned in `next.config.mjs` for correct tracing.
+
+## Downward-view restriction (nadir blur)
+
+360° store photos usually have an ugly nadir — a tripod mount or a stitching
+seam straight down. The viewer hides it without a black patch:
+
+- **Horizontal:** full 360° rotation, always. Untouched.
+- **Downward blur:** from **−45°** below the horizon the environment eases into
+  a soft frosted blur, reaching **fully frosted at −55°**. It's the *same*
+  panorama, blurred (a second sphere sampling the same texture in a shader) —
+  so the floor stays visible, just defocused; no dark spot, vignette, or hard
+  edge. Only the bottom cap runs the blur (a `discard` skips everything above
+  the band), so there's no whole-frame post-processing and no measurable perf
+  cost.
+- **Camera stop (desktop):** drag/keyboard look can't rotate past **−55°**, so
+  you never travel into the fully-frosted region. Upward look keeps its own
+  (larger) limit; yaw is never constrained.
+- **In VR:** head tracking is never clamped (it can't be) — if you physically
+  tilt all the way down, the blur is simply what you see there.
+- **Configurable:** `NADIR_BLUR_CONFIG` in `lib/vr/config.ts` (`fadeStartDeg`,
+  `limitDeg`, `blurRadius`). `limitDeg` drives both the blur's full-frost angle
+  and the desktop camera stop, so they always agree.
+
+Hotspots, the product panel, and the debug UI render above the blur (higher
+`renderOrder`), so they stay crisp over a blurred floor.
 
 ## 10. Known limitations of V1
 

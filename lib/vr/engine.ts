@@ -7,14 +7,13 @@ import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
 import { ViewControlsPanel3D, type ViewControlAction } from './viewControlsPanel3D';
-import { NadirMask } from './nadirMask';
 import {
   VR_CONFIG,
   DEG2RAD,
   DEBUG_VIEW_DEFAULTS,
   DEBUG_VIEW_RANGES,
   DEBUG_VIEW_VR_STEPS,
-  NADIR_MASK_CONFIG,
+  NADIR_BLUR_CONFIG,
 } from './config';
 
 export interface DebugInfo {
@@ -79,18 +78,16 @@ export class VRSceneEngine {
    *  — a DOM overlay is never composited into an immersive session, so this
    *  is the only way to see/use it while actually wearing the headset. */
   private viewControlsPanel3D = new ViewControlsPanel3D();
-  /** Always-on soft mask hiding the extreme downward (nadir) view. Works in
-   *  both desktop and WebXR without ever clamping camera/headset rotation. */
-  private nadirMask = new NadirMask(
-    NADIR_MASK_CONFIG.fadeStartDeg,
-    NADIR_MASK_CONFIG.limitDeg,
-    NADIR_MASK_CONFIG.color,
-  );
-  private tmpCameraWorldPos = new THREE.Vector3();
 
   // Desktop look state.
   private yaw = 0;
   private pitch = 0;
+  /** Hard stop on how far *down* the desktop camera may rotate (deg from the
+   *  horizon). Matches the nadir blur's limit so the camera never travels into
+   *  the fully-frosted region. Upward look is governed by the symmetric
+   *  pitch limit instead. (Headset rotation is never clamped — the blur cap
+   *  covers the nadir there.) */
+  private nadirDownLimitDeg: number = Math.abs(NADIR_BLUR_CONFIG.limitDeg);
 
   // Live-tunable view settings (debug panel). Defaults mirror VR_CONFIG's
   // production values; setDebug(true) reseeds them from DEBUG_VIEW_DEFAULTS.
@@ -152,11 +149,6 @@ export class VRSceneEngine {
     this.rig.add(this.camera);
     this.scene.add(this.rig);
 
-    // Nadir mask sits in world space (not parented to the camera/rig) so its
-    // masked region stays fixed to the downward direction as the user looks
-    // around; only its position follows the camera each frame.
-    this.scene.add(this.nadirMask.mesh);
-
     // --- Managers ---
     this.hotspots = new HotspotManager(this.textures, (h) => this.resolveHotspotLabel(h));
     this.scene.add(this.hotspots.group);
@@ -217,7 +209,6 @@ export class VRSceneEngine {
     this.hotspots.dispose();
     this.panel.dispose();
     this.viewControlsPanel3D.dispose();
-    this.nadirMask.dispose();
     this.textures.disposeAll();
     this.clearDebugGizmos();
     this.renderer.dispose();
@@ -296,23 +287,24 @@ export class VRSceneEngine {
    */
   setPitchLimit(deg: number): void {
     this.pitchLimitDeg = deg;
-    this.pitch = THREE.MathUtils.clamp(this.pitch, -deg, deg);
+    this.pitch = this.clampPitch(this.pitch);
+  }
+
+  /**
+   * Clamp a desktop pitch (deg): up by the symmetric look limit, down by the
+   * tighter of that limit and the nadir hard stop — so the camera can never
+   * rotate past the fully-frosted downward region (§ downward-view restriction).
+   * Horizontal (yaw) is never touched, so full 360° look is preserved.
+   */
+  private clampPitch(deg: number): number {
+    const down = -Math.min(this.pitchLimitDeg, this.nadirDownLimitDeg);
+    return THREE.MathUtils.clamp(deg, down, this.pitchLimitDeg);
   }
 
   /** Live-resize the panorama sphere (units) without reloading the scene. */
   setPanoramaRadius(units: number): void {
     this.panoramaRadiusUnits = units;
     this.sceneManager.setRadius(units);
-  }
-
-  /**
-   * Configure the downward (nadir) mask: `fadeStartDeg` is where the soft
-   * fade begins and `limitDeg` where the view is fully obscured (both
-   * negative = below the horizon). Applies live; defaults come from
-   * NADIR_MASK_CONFIG. Never affects horizontal look or camera rotation.
-   */
-  setNadirLimits(fadeStartDeg: number, limitDeg: number): void {
-    this.nadirMask.setLimits(fadeStartDeg, limitDeg);
   }
 
   /**
@@ -323,7 +315,7 @@ export class VRSceneEngine {
    */
   setLookOrientation(yawDeg: number, pitchDeg: number): void {
     this.yaw = yawDeg;
-    this.pitch = THREE.MathUtils.clamp(pitchDeg, -this.pitchLimitDeg, this.pitchLimitDeg);
+    this.pitch = this.clampPitch(pitchDeg);
   }
 
   /** Current values of the live-tunable view settings, for the debug panel. */
@@ -447,12 +439,6 @@ export class VRSceneEngine {
       this.updatePointerHover();
     }
 
-    // Keep the nadir mask centred on the actual head position (the XR camera
-    // while presenting, otherwise the desktop camera) so its downward mask
-    // stays anchored regardless of eye-height offset or head movement.
-    const head = this.renderer.xr.isPresenting ? this.renderer.xr.getCamera() : this.camera;
-    this.nadirMask.update(head.getWorldPosition(this.tmpCameraWorldPos));
-
     // FPS.
     this.frames += 1;
     this.fpsAccum += dt;
@@ -486,7 +472,7 @@ export class VRSceneEngine {
     // forced camera movement).
     if (this.renderer.xr.isPresenting) return;
     this.yaw = o.yaw;
-    this.pitch = THREE.MathUtils.clamp(o.pitch, -this.pitchLimitDeg, this.pitchLimitDeg);
+    this.pitch = this.clampPitch(o.pitch);
   }
 
   private updatePointerHover(): void {
@@ -534,11 +520,7 @@ export class VRSceneEngine {
       const dy = e.clientY - this.lastPointer.y;
       this.pointerMoved += Math.abs(dx) + Math.abs(dy);
       this.yaw -= dx * VR_CONFIG.dragSensitivity;
-      this.pitch = THREE.MathUtils.clamp(
-        this.pitch - dy * VR_CONFIG.dragSensitivity,
-        -this.pitchLimitDeg,
-        this.pitchLimitDeg,
-      );
+      this.pitch = this.clampPitch(this.pitch - dy * VR_CONFIG.dragSensitivity);
       this.lastPointer.set(e.clientX, e.clientY);
     }
   };
@@ -562,9 +544,9 @@ export class VRSceneEngine {
     if (e.key === 'ArrowLeft') this.yaw += VR_CONFIG.keyboardYawStep;
     else if (e.key === 'ArrowRight') this.yaw -= VR_CONFIG.keyboardYawStep;
     else if (e.key === 'ArrowUp')
-      this.pitch = THREE.MathUtils.clamp(this.pitch + VR_CONFIG.keyboardYawStep, -this.pitchLimitDeg, this.pitchLimitDeg);
+      this.pitch = this.clampPitch(this.pitch + VR_CONFIG.keyboardYawStep);
     else if (e.key === 'ArrowDown')
-      this.pitch = THREE.MathUtils.clamp(this.pitch - VR_CONFIG.keyboardYawStep, -this.pitchLimitDeg, this.pitchLimitDeg);
+      this.pitch = this.clampPitch(this.pitch - VR_CONFIG.keyboardYawStep);
     else if (e.key === 'Escape') this.closeProductPanel();
     else if (e.key === 'h' || e.key === 'H') this.goHome();
   };
