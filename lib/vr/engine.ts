@@ -1008,35 +1008,40 @@ export class VRSceneEngine {
   }
 
   /**
-   * Poll the right-hand controller's A button each frame (WebXR has no button
-   * event, so we edge-detect `pressed`). A hops the "focus" to the next
-   * hotspot in the scene — a no-aim safety fallback for selecting a small
-   * floor pad: press A to step the highlight through the pads, then pull the
-   * trigger to travel to the focused one.
+   * Poll the controller face buttons each frame (WebXR has no button event, so
+   * we edge-detect `pressed`). Pressing A jumps to the next view — it advances
+   * to the next navigation hotspot in the scene and travels there, so a single
+   * button changes views without having to aim the ray at a small floor pad.
    *
-   * On the standard Oculus/Meta Touch mapping buttons[4] = A (right) and
-   * buttons[5] = B; we accept either so the hop works regardless of which the
-   * runtime reports.
+   * On the standard Touch mapping buttons[4] = A (right) / X (left) and
+   * buttons[5] = B / Y. Detection is deliberately broad: any face button
+   * (index ≥ 4) on the right controller — and, as a fallback, the left — so it
+   * responds regardless of which index a given runtime reports for A.
    */
   private pollControllerButtons(): void {
     const session = this.renderer.xr.getSession();
     if (!session) return;
     let pressed = false;
     for (const src of session.inputSources) {
-      if (src.handedness !== 'right' || !src.gamepad) continue;
+      if (!src.gamepad) continue;
       const b = src.gamepad.buttons;
-      if (b[4]?.pressed || b[5]?.pressed) pressed = true;
+      for (let i = 4; i < b.length; i++) {
+        if (b[i]?.pressed) {
+          pressed = true;
+          break;
+        }
+      }
     }
-    if (pressed && !this.hotspotHopBtnPrev) this.cycleHotspotFocus();
+    if (pressed && !this.hotspotHopBtnPrev) this.hopToNextView();
     this.hotspotHopBtnPrev = pressed;
   }
 
-  /** Advance the focused hotspot (highlight + label) to the next one. */
-  private cycleHotspotFocus(): void {
-    const focused = this.hotspots.focusNext();
-    if (focused) {
-      this.cb.onEvent?.('navigation_hotspot_focused', { hotspotId: focused.id });
-    }
+  /** Advance to the next navigation hotspot in the scene and travel to it. */
+  private hopToNextView(): void {
+    const next = this.hotspots.focusNext();
+    if (!next) return;
+    this.cb.onEvent?.('navigation_hotspot_focused', { hotspotId: next.id });
+    this.activateHotspot(next);
   }
 
   /* --------------------------- shared interaction ----------------------- */
