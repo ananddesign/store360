@@ -15,12 +15,14 @@ interface VRControlsProps {
   isProductPanelOpen: boolean;
   isMuted: boolean;
   debugEnabled: boolean;
+  editEnabled: boolean;
   floors: FloorOption[];
   activeFloorId: string | null;
   onEnterVR: () => void;
   onCloseProduct: () => void;
   onToggleMute: () => void;
   onToggleDebug: () => void;
+  onToggleEdit: () => void;
   onSelectFloor: (floorId: string) => void;
   onPreloadFloor: (floorId: string) => void;
   onRecenter: () => void;
@@ -80,12 +82,14 @@ export function VRControls({
   isProductPanelOpen,
   isMuted,
   debugEnabled,
+  editEnabled,
   floors,
   activeFloorId,
   onEnterVR,
   onCloseProduct,
   onToggleMute,
   onToggleDebug,
+  onToggleEdit,
   onSelectFloor,
   onPreloadFloor,
   onRecenter,
@@ -175,6 +179,21 @@ export function VRControls({
         >
           <GearIcon />
         </button>
+
+        {/* Edit hotspots toggle — opens the placement editor (no ?edit=true
+            needed). Gold when active. */}
+        <button
+          onClick={onToggleEdit}
+          aria-label={editEnabled ? 'Exit hotspot editing' : 'Edit hotspots'}
+          title={editEnabled ? 'Exit hotspot editing' : 'Edit hotspots'}
+          className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur transition ${
+            editEnabled
+              ? 'border-qween-gold bg-qween-gold/90 text-qween-void hover:bg-qween-gold'
+              : 'border-qween-line bg-black/50 text-qween-diamond hover:bg-black/70'
+          }`}
+        >
+          <PencilIcon />
+        </button>
       </div>
 
       {/* Desktop convenience close for the spatial product panel. */}
@@ -254,6 +273,21 @@ function SpeakerIcon({ muted }: { muted: boolean }) {
           opacity={0.9}
         />
       )}
+    </svg>
+  );
+}
+
+/** Minimal pencil glyph for the Edit-hotspots toggle (placement editor). */
+function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 20h4L18.5 9.5a2 2 0 0 0 0-2.83l-1.17-1.17a2 2 0 0 0-2.83 0L4 16v4Z"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 7 17 10.5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
     </svg>
   );
 }

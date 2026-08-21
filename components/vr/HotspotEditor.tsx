@@ -4,6 +4,18 @@ import { useState } from 'react';
 import type { EditableHotspot } from '@/lib/vr/engine';
 import { scenes } from '@/data/scenes';
 import { getFloorIdForScene } from '@/data/floors';
+import {
+  clearHotspotOverrides,
+  saveHotspotOverrides,
+  type HotspotOverrides,
+} from '@/lib/vr/hotspotOverrides';
+
+/** Every scene as a { id, label } option for target pickers. */
+const SCENE_OPTIONS: { id: string; label: string }[] = scenes.map((s) => {
+  const floorId = getFloorIdForScene(s.id);
+  const node = floorId ? s.id.slice(floorId.length + 1) : s.id;
+  return { id: s.id, label: floorId ? `${floorId} · ${node}` : s.id };
+});
 
 interface HotspotEditorProps {
   /** Current scene's hotspots (live positions), emitted by the engine. */
@@ -16,6 +28,12 @@ interface HotspotEditorProps {
   onNudge: (id: string, axis: 'x' | 'y' | 'z', delta: number) => void;
   /** Set an exact position (from a typed value). */
   onSetPosition: (id: string, pos: { x: number; y: number; z: number }) => void;
+  /** Add a new hotspot to the current scene, pointing at targetSceneId. */
+  onAddHotspot: (targetSceneId: string) => void;
+  /** Remove a hotspot from the current scene. */
+  onRemoveHotspot: (id: string) => void;
+  /** Reassign a hotspot's destination scene. */
+  onSetTarget: (id: string, targetSceneId: string) => void;
 }
 
 const STEPS = [0.1, 0.25, 0.5, 1] as const;
@@ -39,10 +57,18 @@ export function HotspotEditor({
   onGoToScene,
   onNudge,
   onSetPosition,
+  onAddHotspot,
+  onRemoveHotspot,
+  onSetTarget,
 }: HotspotEditorProps) {
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [step, setStep] = useState<number>(0.25);
   const [selected, setSelected] = useState<string | null>(null);
+  // Default the "add" target to the first scene that isn't the current one.
+  const [addTarget, setAddTarget] = useState<string>(
+    () => SCENE_OPTIONS.find((o) => o.id !== currentSceneId)?.id ?? SCENE_OPTIONS[0]?.id ?? '',
+  );
 
   const exportText = generateFloorsSnippet();
 
@@ -54,6 +80,29 @@ export function HotspotEditor({
     } catch {
       /* clipboard blocked — the <pre> below is selectable as a fallback */
     }
+  };
+
+  /** Persist every scene's current positions locally so edits survive reload
+   *  (until baked into data/floors.ts via the copied snippet). */
+  const save = () => {
+    const map: HotspotOverrides = {};
+    for (const s of scenes) {
+      const navs = s.hotspots.filter((h) => h.type === 'navigation');
+      if (navs.length === 0) continue;
+      map[s.id] = navs.map((h) => ({
+        targetSceneId: h.type === 'navigation' ? h.targetSceneId : '',
+        position: { x: r(h.position.x), y: r(h.position.y), z: r(h.position.z) },
+        style: (h.type === 'navigation' && h.style) || 'floor',
+      }));
+    }
+    saveHotspotOverrides(map);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1600);
+  };
+
+  const clearSaved = () => {
+    clearHotspotOverrides();
+    setSaved(false);
   };
 
   return (
@@ -106,17 +155,34 @@ export function HotspotEditor({
               }`}
               onMouseEnter={() => setSelected(h.id)}
             >
-              <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className="text-qween-mist">→</span>
+                <select
+                  value={h.targetSceneId}
+                  onChange={(e) => onSetTarget(h.id, e.target.value)}
+                  title="Destination scene"
+                  className="min-w-0 flex-1 rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-qween-diamond outline-none focus:border-qween-gold/60"
+                >
+                  {SCENE_OPTIONS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => onGoToScene(h.targetSceneId)}
                   title={`Open ${h.targetSceneId}`}
-                  className="text-left text-qween-gold-soft underline decoration-dotted underline-offset-2 hover:text-qween-diamond"
+                  className="rounded border border-qween-line px-1.5 py-0.5 text-[10px] text-qween-gold-soft transition hover:bg-white/10"
                 >
-                  → {h.targetSceneId}
+                  open
                 </button>
-                <span className="text-[9px] uppercase tracking-widest text-qween-mist">
-                  {h.style}
-                </span>
+                <button
+                  onClick={() => onRemoveHotspot(h.id)}
+                  title="Delete this hotspot"
+                  className="rounded border border-qween-line px-1.5 py-0.5 text-[10px] text-qween-mist transition hover:bg-white/10 hover:text-qween-diamond"
+                >
+                  ✕
+                </button>
               </div>
 
               {(['x', 'y', 'z'] as const).map((axis) => (
@@ -132,6 +198,31 @@ export function HotspotEditor({
             </div>
           );
         })}
+
+        {/* Add a new hotspot to this scene. */}
+        <div className="mt-1 flex items-center gap-1.5">
+          <select
+            value={addTarget}
+            onChange={(e) => setAddTarget(e.target.value)}
+            title="Destination for the new hotspot"
+            className="min-w-0 flex-1 rounded border border-white/10 bg-black/60 px-1.5 py-1 text-qween-diamond outline-none focus:border-qween-gold/60"
+          >
+            {SCENE_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => addTarget && onAddHotspot(addTarget)}
+            className="rounded border border-qween-line bg-qween-gold/90 px-3 py-1 font-sans text-[10px] uppercase tracking-widest text-qween-void transition hover:bg-qween-gold"
+          >
+            + Add
+          </button>
+        </div>
+        <div className="mt-1 text-[10px] text-qween-mist">
+          New pad drops in front of you — drag or nudge it into place.
+        </div>
       </div>
 
       {/* Jump to any scene so every scene's pads can be edited. */}
@@ -159,14 +250,30 @@ export function HotspotEditor({
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2">
+        <button
+          onClick={save}
+          title="Persist positions locally so they survive a reload"
+          className="rounded border border-qween-line bg-black/50 px-3 py-1 font-sans text-[10px] uppercase tracking-widest text-qween-diamond transition hover:bg-black/70"
+        >
+          {saved ? 'Saved ✓' : 'Save'}
+        </button>
         <button
           onClick={copy}
           className="rounded border border-qween-line bg-qween-gold/90 px-3 py-1 font-sans text-[10px] uppercase tracking-widest text-qween-void transition hover:bg-qween-gold"
         >
           {copied ? 'Copied ✓' : 'Copy all positions'}
         </button>
-        <span className="font-sans text-[10px] text-qween-mist">→ paste to Claude / data/floors.ts</span>
+        <button
+          onClick={clearSaved}
+          title="Forget locally-saved positions (data/floors.ts still applies)"
+          className="rounded border border-qween-line px-2 py-1 font-sans text-[10px] uppercase tracking-widest text-qween-mist transition hover:bg-white/10"
+        >
+          Clear
+        </button>
+      </div>
+      <div className="mt-1 font-sans text-[10px] text-qween-mist">
+        Save keeps edits across reloads · Copy → paste to Claude / data/floors.ts to make permanent
       </div>
 
       <pre className="mt-2 max-h-[32vh] select-text overflow-auto rounded border border-white/10 bg-black/60 p-2 text-[10px] leading-snug text-qween-mist">

@@ -56,15 +56,12 @@ export interface FloorConfig {
 }
 
 /**
- * Floor-pad positions: on the ground (y ≈ −eye height), a few metres ahead of
- * or behind the viewer, in the open floor area. Every navigation hotspot now
- * renders as a flat QWEEN floor projection (style defaults to 'floor' in
- * data/scenes.ts), so these sit low rather than at eye level. Tune per scene so
- * a pad lands on open floor, never over furniture.
+ * Floor-pad positions sit on the ground (y ≈ −eye height), placed per scene in
+ * the open floor area. Every navigation hotspot renders as a flat QWEEN floor
+ * projection (style defaults to 'floor' in data/scenes.ts). These values were
+ * dialled in with the in-app editor (pencil icon / ?edit=true) — retune there
+ * and paste the exported snippet back here.
  */
-const FORWARD: Vec3 = { x: 0, y: -1.5, z: -3 };
-const BACKWARD: Vec3 = { x: 0, y: -1.5, z: 3 };
-
 export const floors: Record<string, FloorConfig> = {
   ground: {
     id: 'ground',
@@ -74,25 +71,18 @@ export const floors: Record<string, FloorConfig> = {
       entry: {
         image: 'groundfloor-entry.jpg',
         initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle', position: FORWARD }],
-      },
-      middle: {
-        image: 'groundfloor-middle.jpg',
-        hotspots: [
-          { target: 'entry', position: BACKWARD },
-          { target: 'middle2', position: FORWARD },
-        ],
+        hotspots: [{ target: 'middle2', position: { x: 1.88, y: -1.5, z: 2.61 } }],
       },
       middle2: {
         image: 'groundfloor-middle2.jpg',
         hotspots: [
-          { target: 'middle', position: BACKWARD },
-          { target: 'last', position: FORWARD },
+          { target: 'entry', position: { x: -4.75, y: -1.5, z: 1.65 } },
+          { target: 'last', position: { x: 0, y: -1.5, z: -3 } },
         ],
       },
       last: {
         image: 'groundfloor-last.jpg',
-        hotspots: [{ target: 'middle2', position: BACKWARD }],
+        hotspots: [{ target: 'middle2', position: { x: 0.86, y: -1.5, z: -4.94 } }],
       },
     },
   },
@@ -104,18 +94,18 @@ export const floors: Record<string, FloorConfig> = {
       entry: {
         image: 'firstfloor-entry.jpg',
         initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle', position: FORWARD }],
+        hotspots: [{ target: 'middle', position: { x: 0.48, y: -1.5, z: 2.02 } }],
       },
       middle: {
         image: 'firstfloor-middle.jpg',
         hotspots: [
-          { target: 'entry', position: BACKWARD },
-          { target: 'last', position: FORWARD },
+          { target: 'entry', position: { x: 0.9, y: -1.5, z: 4.79 } },
+          { target: 'last', position: { x: 0, y: -1.5, z: -3 } },
         ],
       },
       last: {
         image: 'firstfloor-last.jpg',
-        hotspots: [{ target: 'middle', position: BACKWARD }],
+        hotspots: [{ target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 } }],
       },
     },
   },
