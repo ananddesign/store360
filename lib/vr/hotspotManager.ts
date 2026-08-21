@@ -111,6 +111,33 @@ export class HotspotManager {
     return this.hovered?.hotspot ?? null;
   }
 
+  /**
+   * Editor (§?edit=true): move the hotspot backing `marker` to a new world
+   * position — updates the visual (floor pad or sprite) + its label and mutates
+   * the underlying hotspot data so the change persists across navigation in the
+   * session (and is exportable). No-op if the marker isn't found.
+   */
+  moveHotspotObject(marker: THREE.Object3D, pos: { x: number; y: number; z: number }): void {
+    const obj = this.objects.find((o) => o.marker === marker);
+    if (!obj) return;
+    if (obj.floor) obj.floor.group.position.set(pos.x, pos.y, pos.z);
+    else if (obj.sprite) obj.sprite.position.set(pos.x, pos.y, pos.z);
+
+    // Re-place the hover label above the new position (mirrors createLabel).
+    const at = new THREE.Vector3(pos.x, pos.y, pos.z);
+    const up = obj.floor ? 1.0 : obj.baseScale * 0.9;
+    const dir = at.clone().normalize();
+    obj.label.position
+      .copy(at)
+      .add(new THREE.Vector3(0, up, 0))
+      .addScaledVector(dir, -0.01);
+
+    // Mutate the shared hotspot data (its position object is per-hotspot).
+    obj.hotspot.position.x = pos.x;
+    obj.hotspot.position.y = pos.y;
+    obj.hotspot.position.z = pos.z;
+  }
+
   clear(): void {
     for (const obj of this.objects) {
       if (obj.floor) {
