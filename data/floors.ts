@@ -77,7 +77,7 @@ export const floors: Record<string, FloorConfig> = {
         image: 'groundfloor-middle2.jpg',
         hotspots: [
           { target: 'entry', position: { x: -4.83, y: -1.5, z: 1.89 }, label: 'GROUND ENTRY VIEW' },
-          { target: 'last', position: { x: 4.68, y: -1.5, z: -2.57 }, label: 'GO TO FIRST FLOOR' },
+          { target: 'first-entry', position: { x: 4.68, y: -1.5, z: -2.57 }, label: 'GO TO FIRST FLOOR' },
         ],
       },
       last: {

@@ -163,8 +163,8 @@ export class VRSceneEngine {
   private controllers: THREE.Group[] = [];
   private controllerLines: THREE.Line[] = [];
   private activeController: THREE.Group | null = null;
-  /** Rising-edge tracking for the right-hand B button (hotspot focus hop). */
-  private bButtonPrev = false;
+  /** Rising-edge tracking for the right-hand A/B button (hotspot focus hop). */
+  private hotspotHopBtnPrev = false;
 
   // Timing / debug.
   private clock = new THREE.Clock();
@@ -237,7 +237,11 @@ export class VRSceneEngine {
       this.hotspots,
       {
         onSceneViewed: (s) => {
-          this.applyHotspotOverrides(s);
+          // Saved editor overrides are a local scratchpad — apply them ONLY
+          // while editing, never to the live/normal experience (which must
+          // always reflect data/floors.ts). Otherwise a stale localStorage
+          // save silently shadows the shipped config for that visitor.
+          if (this.editMode) this.applyHotspotOverrides(s);
           this.cb.onSceneChange?.(s);
           this.cb.onEvent?.('scene_viewed', { sceneId: s.id });
           this.nadirBlur.setTexture(this.sceneManager.currentTexture);
@@ -372,6 +376,12 @@ export class VRSceneEngine {
     this.editorDrag = null;
     this.setCursor(false);
     this.hotspots.setEditMode(on);
+    // Entering edit mode: apply the local saved scratchpad so in-progress edits
+    // are visible to keep working on. (Not applied in normal viewing — see
+    // onSceneViewed — so the live experience always reflects data/floors.ts.)
+    if (on && this.sceneManager.currentScene) {
+      this.applyHotspotOverrides(this.sceneManager.currentScene);
+    }
     // Relabel the current scene's pads with their destinations (or restore the
     // normal labels when leaving edit mode).
     if (this.sceneManager.currentScene) {
@@ -998,24 +1008,27 @@ export class VRSceneEngine {
   }
 
   /**
-   * Poll the right-hand controller's B button each frame (WebXR has no button
-   * event, so we edge-detect `pressed`). B hops the "focus" to the next
+   * Poll the right-hand controller's A button each frame (WebXR has no button
+   * event, so we edge-detect `pressed`). A hops the "focus" to the next
    * hotspot in the scene — a no-aim safety fallback for selecting a small
-   * floor pad: press B to step the highlight through the pads, then pull the
+   * floor pad: press A to step the highlight through the pads, then pull the
    * trigger to travel to the focused one.
+   *
+   * On the standard Oculus/Meta Touch mapping buttons[4] = A (right) and
+   * buttons[5] = B; we accept either so the hop works regardless of which the
+   * runtime reports.
    */
   private pollControllerButtons(): void {
     const session = this.renderer.xr.getSession();
     if (!session) return;
-    let bPressed = false;
+    let pressed = false;
     for (const src of session.inputSources) {
-      // buttons[5] = B (right hand) / Y (left hand) on the standard mapping.
-      if (src.handedness === 'right' && src.gamepad && src.gamepad.buttons[5]?.pressed) {
-        bPressed = true;
-      }
+      if (src.handedness !== 'right' || !src.gamepad) continue;
+      const b = src.gamepad.buttons;
+      if (b[4]?.pressed || b[5]?.pressed) pressed = true;
     }
-    if (bPressed && !this.bButtonPrev) this.cycleHotspotFocus();
-    this.bButtonPrev = bPressed;
+    if (pressed && !this.hotspotHopBtnPrev) this.cycleHotspotFocus();
+    this.hotspotHopBtnPrev = pressed;
   }
 
   /** Advance the focused hotspot (highlight + label) to the next one. */
