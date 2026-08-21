@@ -136,7 +136,7 @@ export function ViewControlsPanel({ engine, currentSceneId }: ViewControlsPanelP
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 left-4 z-40 w-72 max-w-[80vw] font-sans">
+    <div className="pointer-events-auto absolute bottom-4 right-4 z-40 max-h-[88vh] w-72 max-w-[80vw] overflow-y-auto font-sans">
       <div className="overflow-hidden rounded-xl border border-qween-line bg-black/75 backdrop-blur">
         <button
           onClick={() => setOpen((o) => !o)}
