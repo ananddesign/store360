@@ -695,9 +695,21 @@ export class VRSceneEngine {
     const pitch = Math.asin(THREE.MathUtils.clamp(this.vrTmpForward.y, -1, 1));
     this.vrPitchDeg = pitch / DEG2RAD;
 
-    const min = this.vrMinPitchDeg * DEG2RAD;
+    // Tighten the gaze limits by the headset's half-FOV so the *visible frame
+    // edge* — not just the gaze centre — respects the limit. Without this a
+    // ±55° gaze clamp still shows the floor at the bottom of a ~90° FOV frame
+    // (you'd see your feet). Half-FOV is read from the XR projection matrix:
+    //   e[5] = 2n/(t−b),  e[9] = (t+b)/(t−b)  →  halfDown = atan((1−e[9])/e[5]).
+    // Only the downward (floor) edge is compensated — the up limit stays the
+    // plain gaze cap (matching desktop), so looking up never feels over-locked.
+    const p = xrCam.projectionMatrix.elements;
+    const a = p[5];
+    const halfDown = a > 1e-4 ? Math.atan((1 - p[9]) / a) : Math.PI / 4;
+
+    const min = this.vrMinPitchDeg * DEG2RAD + halfDown;
     const max = this.vrMaxPitchDeg * DEG2RAD;
-    const excess = pitch - THREE.MathUtils.clamp(pitch, min, max);
+    const lo = Math.min(min, max);
+    const excess = pitch - THREE.MathUtils.clamp(pitch, lo, max);
 
     if (Math.abs(excess) < 1e-4) {
       this.world.quaternion.identity();
