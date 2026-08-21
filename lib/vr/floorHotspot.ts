@@ -33,7 +33,8 @@ export interface FloorHotspotOptions {
 
 const DEFAULT_COLOR = '#9fe4ff';
 const DEFAULT_SIZE = 0.6;
-const PULSE_PERIOD_S = 3.2;
+/** Slow, calm breathing period (s). Higher = more languid. */
+const PULSE_PERIOD_S = 6.0;
 
 export class FloorHotspot {
   /** Positioned root — add to the scene graph; carries the flat pad + hit disc. */

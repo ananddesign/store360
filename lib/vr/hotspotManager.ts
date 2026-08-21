@@ -50,10 +50,17 @@ export class HotspotManager {
     this.editMode = on;
   }
 
-  /** Label text: in edit mode a nav hotspot shows its destination scene id. */
+  /**
+   * Label text. A named nav hotspot always shows its name (both modes). An
+   * unnamed one (still the default "Explore") shows its destination scene id
+   * while editing, so pads remain identifiable before they're named.
+   */
   private labelFor(hotspot: VRHotspot): string {
-    if (this.editMode && hotspot.type === 'navigation') {
-      return `→ ${hotspot.targetSceneId}`;
+    if (hotspot.type === 'navigation') {
+      const name = hotspot.label?.trim();
+      if (name && name.toLowerCase() !== 'explore') return name;
+      if (this.editMode) return `→ ${hotspot.targetSceneId}`;
+      return name || 'Explore';
     }
     return this.resolveLabel(hotspot);
   }
@@ -81,10 +88,11 @@ export class HotspotManager {
         // Floor pad owns its own (flat, slow, architectural) animation.
         obj.floor.update(elapsed, obj.hover);
       } else if (obj.sprite) {
+        // Slow, calm breathing (~6s period) — restrained, never bouncy.
         const pulse =
           obj.hotspot.type === 'navigation'
-            ? 1 + Math.sin(elapsed * 2) * 0.04
-            : 1 + Math.sin(elapsed * 3 + obj.sprite.position.x) * 0.06;
+            ? 1 + Math.sin(elapsed * 1.05) * 0.04
+            : 1 + Math.sin(elapsed * 1.4 + obj.sprite.position.x) * 0.05;
 
         const scale =
           obj.baseScale *
@@ -96,11 +104,12 @@ export class HotspotManager {
         markerMat.opacity = 0.72 + obj.hover * 0.28;
       }
 
-      // Labels reveal only on hover/tap — the marker itself is the minimal,
-      // always-visible navigation cue (§2: "no large arrows or game-like UI").
-      // In edit mode they stay visible so every pad's destination is readable.
+      // Labels stay subtly visible at all times (small, low-opacity name under
+      // the pad), lifting to full on hover. Edit mode keeps them near-solid so
+      // every pad is clearly identifiable while placing.
       const labelMat = obj.label.material as THREE.SpriteMaterial;
-      labelMat.opacity = this.editMode ? Math.max(0.85, obj.hover) : obj.hover;
+      const base = this.editMode ? 0.85 : 0.42;
+      labelMat.opacity = Math.max(base, obj.hover);
       obj.label.visible = labelMat.opacity > 0.02;
     }
   }
@@ -160,6 +169,28 @@ export class HotspotManager {
   moveHotspotById(id: string, pos: { x: number; y: number; z: number }): void {
     const obj = this.objects.find((o) => o.hotspot.id === id);
     if (obj) this.moveHotspotObject(obj.marker, pos);
+  }
+
+  /**
+   * Editor: rename a hotspot by id. Updates the underlying data and swaps just
+   * that hotspot's label sprite (cheap — no full scene rebuild), keeping its
+   * position. No-op if not found.
+   */
+  setLabelById(id: string, label: string): void {
+    const obj = this.objects.find((o) => o.hotspot.id === id);
+    if (!obj || obj.hotspot.type !== 'navigation') return;
+    obj.hotspot.label = label;
+
+    const oldLabel = obj.label;
+    const at = obj.floor
+      ? obj.floor.group.position.clone()
+      : obj.sprite!.position.clone();
+    const up = obj.floor ? 1.0 : obj.baseScale * 0.9;
+    const next = this.createLabel(this.labelFor(obj.hotspot), at, up);
+    this.group.add(next);
+    this.group.remove(oldLabel);
+    (oldLabel.material as THREE.SpriteMaterial).dispose();
+    obj.label = next;
   }
 
   clear(): void {
@@ -239,7 +270,7 @@ export class HotspotManager {
       .addScaledVector(dir, -0.01);
     const img = labelMat.map!.image as HTMLCanvasElement;
     const aspect = img.width / img.height;
-    const labelHeight = 0.22;
+    const labelHeight = 0.14; // small, subtle
     label.scale.set(labelHeight * aspect, labelHeight, 1);
     label.renderOrder = 11;
     return label;

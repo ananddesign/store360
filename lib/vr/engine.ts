@@ -40,6 +40,7 @@ export interface EditableHotspot {
   id: string;
   sceneId: string;
   targetSceneId: string;
+  label: string;
   style: 'floor' | 'billboard';
   position: { x: number; y: number; z: number };
 }
@@ -388,6 +389,7 @@ export class VRSceneEngine {
         id: h.id,
         sceneId: scene.id,
         targetSceneId: h.targetSceneId,
+        label: h.label ?? 'Explore',
         style: h.style ?? 'floor',
         position: {
           x: round(h.position.x),
@@ -412,7 +414,7 @@ export class VRSceneEngine {
     const navs: NavigationHotspot[] = saved.map((s) => ({
       id: `${scene.id}-nav-${this.hotspotSeq++}`,
       type: 'navigation',
-      label: 'Explore',
+      label: s.label ?? 'Explore',
       targetSceneId: s.targetSceneId,
       position: { x: s.position.x, y: s.position.y, z: s.position.z },
       style: s.style,
@@ -457,6 +459,12 @@ export class VRSceneEngine {
     if (!h || h.type !== 'navigation') return;
     h.targetSceneId = targetSceneId;
     this.hotspots.setScene(scene); // relabel the pad with its new destination
+    this.emitEditable();
+  }
+
+  /** Editor: rename a hotspot (the small label shown on the pad). */
+  setHotspotLabel(id: string, label: string): void {
+    this.hotspots.setLabelById(id, label);
     this.emitEditable();
   }
 

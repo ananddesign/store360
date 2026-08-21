@@ -239,6 +239,7 @@ export function VRExperience() {
           onAddHotspot={(targetSceneId) => engineRef.current?.addHotspot(targetSceneId)}
           onRemoveHotspot={(id) => engineRef.current?.removeHotspot(id)}
           onSetTarget={(id, targetSceneId) => engineRef.current?.setHotspotTarget(id, targetSceneId)}
+          onSetLabel={(id, label) => engineRef.current?.setHotspotLabel(id, label)}
         />
       )}
 
