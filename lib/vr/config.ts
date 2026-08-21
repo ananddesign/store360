@@ -89,3 +89,21 @@ export const DEBUG_VIEW_VR_STEPS = {
   initialPitchDeg: 5,
   initialYawDeg: 15,
 } as const;
+
+/**
+ * Always-on "hide the nadir" mask (lib/vr/nadirMask.ts) — softly obscures the
+ * extreme downward view, where a tripod mount or a stitching seam commonly
+ * ruins 360° photography. Independent of the desktop pitch-look clamp
+ * (`maxPitchDeg` / the View Controls pitch limit): it never touches camera
+ * rotation — it can't, for a headset, since head tracking is authoritative —
+ * it only renders an increasingly opaque overlay as the gaze direction
+ * approaches `limitDeg`. Full 360° horizontal look is completely unaffected.
+ */
+export const NADIR_MASK_CONFIG = {
+  /** Elevation (deg, negative = downward) where the fade begins. */
+  fadeStartDeg: -45,
+  /** Elevation (deg, negative = downward) beyond which the view is fully masked. */
+  limitDeg: -55,
+  /** Mask colour — matches the QWEEN void background. */
+  color: 0x0a0a0b,
+} as const;

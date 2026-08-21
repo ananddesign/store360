@@ -82,6 +82,7 @@ lib/
     hotspotManager.ts   Hotspot markers, labels, hover, raycast
     productPanel.ts     Spatial 3D product panel
     viewControlsPanel3D.ts  In-headset 3D View Controls (tap +/- steppers)
+    nadirMask.ts        Soft always-on mask hiding the extreme downward view
     textureManager.ts   Panorama load/preload/dispose (§17)
     placeholder.ts      Procedural placeholder panoramas/products/markers
     webxr.ts            WebXR capability detection
@@ -220,6 +221,15 @@ subtle gold ray appears), and pull the **trigger** to select navigation or
 product hotspots. **Squeeze the grip ("pinch") on either controller to jump
 back to the home scene** at any time. There is no forced locomotion —
 you travel only by selecting hotspots or the home gesture (§23).
+
+You can look a full 360° horizontally and freely up. Looking far **down**,
+the extreme nadir (where a tripod/stitching seam usually sits) softly fades
+to a solid QWEEN-void colour — the fade begins ~45° below the horizon and is
+fully opaque by ~55°. This is an overlay, not a rotation limit: the camera
+(and, in VR, your head) is never clamped, so there's no wall to hit and no
+snapping — it works identically on desktop and in the headset. Tunable via
+`NADIR_MASK_CONFIG` in `lib/vr/config.ts` (or `engine.setNadirLimits()` at
+runtime); set both angles past −90° to effectively disable it.
 
 ## 6. How to add a new 360 scene
 

@@ -7,7 +7,15 @@ import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
 import { ViewControlsPanel3D, type ViewControlAction } from './viewControlsPanel3D';
-import { VR_CONFIG, DEG2RAD, DEBUG_VIEW_DEFAULTS, DEBUG_VIEW_RANGES, DEBUG_VIEW_VR_STEPS } from './config';
+import { NadirMask } from './nadirMask';
+import {
+  VR_CONFIG,
+  DEG2RAD,
+  DEBUG_VIEW_DEFAULTS,
+  DEBUG_VIEW_RANGES,
+  DEBUG_VIEW_VR_STEPS,
+  NADIR_MASK_CONFIG,
+} from './config';
 
 export interface DebugInfo {
   sceneId: string | null;
@@ -71,6 +79,14 @@ export class VRSceneEngine {
    *  — a DOM overlay is never composited into an immersive session, so this
    *  is the only way to see/use it while actually wearing the headset. */
   private viewControlsPanel3D = new ViewControlsPanel3D();
+  /** Always-on soft mask hiding the extreme downward (nadir) view. Works in
+   *  both desktop and WebXR without ever clamping camera/headset rotation. */
+  private nadirMask = new NadirMask(
+    NADIR_MASK_CONFIG.fadeStartDeg,
+    NADIR_MASK_CONFIG.limitDeg,
+    NADIR_MASK_CONFIG.color,
+  );
+  private tmpCameraWorldPos = new THREE.Vector3();
 
   // Desktop look state.
   private yaw = 0;
@@ -136,6 +152,11 @@ export class VRSceneEngine {
     this.rig.add(this.camera);
     this.scene.add(this.rig);
 
+    // Nadir mask sits in world space (not parented to the camera/rig) so its
+    // masked region stays fixed to the downward direction as the user looks
+    // around; only its position follows the camera each frame.
+    this.scene.add(this.nadirMask.mesh);
+
     // --- Managers ---
     this.hotspots = new HotspotManager(this.textures, (h) => this.resolveHotspotLabel(h));
     this.scene.add(this.hotspots.group);
@@ -196,6 +217,7 @@ export class VRSceneEngine {
     this.hotspots.dispose();
     this.panel.dispose();
     this.viewControlsPanel3D.dispose();
+    this.nadirMask.dispose();
     this.textures.disposeAll();
     this.clearDebugGizmos();
     this.renderer.dispose();
@@ -281,6 +303,16 @@ export class VRSceneEngine {
   setPanoramaRadius(units: number): void {
     this.panoramaRadiusUnits = units;
     this.sceneManager.setRadius(units);
+  }
+
+  /**
+   * Configure the downward (nadir) mask: `fadeStartDeg` is where the soft
+   * fade begins and `limitDeg` where the view is fully obscured (both
+   * negative = below the horizon). Applies live; defaults come from
+   * NADIR_MASK_CONFIG. Never affects horizontal look or camera rotation.
+   */
+  setNadirLimits(fadeStartDeg: number, limitDeg: number): void {
+    this.nadirMask.setLimits(fadeStartDeg, limitDeg);
   }
 
   /**
@@ -414,6 +446,12 @@ export class VRSceneEngine {
       this.applyDesktopLook();
       this.updatePointerHover();
     }
+
+    // Keep the nadir mask centred on the actual head position (the XR camera
+    // while presenting, otherwise the desktop camera) so its downward mask
+    // stays anchored regardless of eye-height offset or head movement.
+    const head = this.renderer.xr.isPresenting ? this.renderer.xr.getCamera() : this.camera;
+    this.nadirMask.update(head.getWorldPosition(this.tmpCameraWorldPos));
 
     // FPS.
     this.frames += 1;
