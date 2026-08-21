@@ -225,6 +225,8 @@ export function VRExperience() {
           sceneName={sceneName}
           currentSceneId={currentScene}
           onGoToScene={(id) => engineRef.current?.goToScene(id)}
+          onNudge={(id, axis, delta) => engineRef.current?.nudgeHotspot(id, axis, delta)}
+          onSetPosition={(id, pos) => engineRef.current?.setHotspotPosition(id, pos)}
         />
       )}
 

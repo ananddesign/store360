@@ -156,6 +156,12 @@ export class HotspotManager {
     obj.hotspot.position.z = pos.z;
   }
 
+  /** Move a hotspot by its id (used by the editor's numeric nudge controls). */
+  moveHotspotById(id: string, pos: { x: number; y: number; z: number }): void {
+    const obj = this.objects.find((o) => o.hotspot.id === id);
+    if (obj) this.moveHotspotObject(obj.marker, pos);
+  }
+
   clear(): void {
     for (const obj of this.objects) {
       if (obj.floor) {

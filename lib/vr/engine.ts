@@ -397,6 +397,23 @@ export class VRSceneEngine {
     this.cb.onEditableHotspots?.(this.getEditableHotspots());
   }
 
+  /** Editor: set a hotspot's exact position by id (numeric controls). */
+  setHotspotPosition(id: string, pos: { x: number; y: number; z: number }): void {
+    this.hotspots.moveHotspotById(id, {
+      x: round(pos.x),
+      y: round(pos.y),
+      z: round(pos.z),
+    });
+    this.emitEditable();
+  }
+
+  /** Editor: nudge one axis of a hotspot by `delta` metres. */
+  nudgeHotspot(id: string, axis: 'x' | 'y' | 'z', delta: number): void {
+    const h = this.getEditableHotspots().find((e) => e.id === id);
+    if (!h) return;
+    this.setHotspotPosition(id, { ...h.position, [axis]: h.position[axis] + delta });
+  }
+
   /** Reposition the hotspot currently being dragged from the mouse ray. */
   private dragEditorHotspot(): void {
     const drag = this.editorDrag;
