@@ -24,6 +24,18 @@ export function DebugOverlay({ info }: DebugOverlayProps) {
       <Row k="webxr" v={info.xr} />
       <Row k="cam.pos" v={`${px}, ${py}, ${pz}`} />
       <Row k="cam.rot°" v={`${rx}, ${ry}, ${rz}`} />
+      <Row
+        k="VR Pitch"
+        v={info.vrPitchDeg === null ? '— (desktop)' : `${info.vrPitchDeg}°`}
+      />
+      <Row
+        k="VR Pitch Limit"
+        v={
+          info.vrPitchLimitDeg[0] === -info.vrPitchLimitDeg[1]
+            ? `±${info.vrPitchLimitDeg[1]}°`
+            : `${info.vrPitchLimitDeg[0]}° / +${info.vrPitchLimitDeg[1]}°`
+        }
+      />
       <Row k="textures" v={info.loadedTextures.join(', ') || '—'} />
       <Row k="hovered" v={info.hovered ?? '—'} />
       <div className="mt-1 border-t border-white/10 pt-1 text-qween-mist">

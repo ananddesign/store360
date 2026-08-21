@@ -110,3 +110,24 @@ export const VERTICAL_LOOK_CONFIG = {
   /** How far *up* you may look (deg above horizon). */
   maxPitchDeg: 90,
 } as const;
+
+/**
+ * Vertical look clamp for the *immersive* (Meta Quest / WebXR) view.
+ *
+ * The desktop clamp (VERTICAL_LOOK_CONFIG, applied by rotating the camera)
+ * can't be used in an immersive session — the headset re-writes the camera
+ * pose every frame and must never be fought. Instead the engine clamps pitch
+ * by counter-rotating a world rig around the panorama (see engine.applyVRPitchLock):
+ * horizontal head movement stays a free 360°, only excess pitch is held back.
+ *
+ * Symmetric ±55° by default (kept separate from the desktop config, whose
+ * upward limit is +90°, so desktop behaviour is unchanged).
+ */
+export const VR_PITCH_LOCK = {
+  /** Eye height (m) — mirrors VR_CONFIG.playerHeight; here for co-location. */
+  eyeHeight: 1.6,
+  /** Furthest you may look down in VR (deg below horizon; negative). */
+  minPitchDeg: -55,
+  /** Furthest you may look up in VR (deg above horizon). */
+  maxPitchDeg: 55,
+} as const;

@@ -34,7 +34,10 @@ export class SceneManager {
   private busy = false;
 
   constructor(
-    private readonly root: THREE.Scene,
+    // Parent for the panorama sphere. Usually a "world rig" group (not the
+    // Scene itself) so the immersive pitch clamp can counter-rotate the whole
+    // environment without touching the headset-driven camera.
+    private readonly root: THREE.Object3D,
     camera: THREE.Camera,
     private readonly textures: TextureManager,
     private readonly hotspots: HotspotManager,

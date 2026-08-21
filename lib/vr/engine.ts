@@ -14,6 +14,7 @@ import {
   DEBUG_VIEW_RANGES,
   DEBUG_VIEW_VR_STEPS,
   VERTICAL_LOOK_CONFIG,
+  VR_PITCH_LOCK,
 } from './config';
 
 export interface DebugInfo {
@@ -25,6 +26,10 @@ export interface DebugInfo {
   loadedTextures: string[];
   hotspotIds: string[];
   hovered: string | null;
+  /** Live headset pitch (deg from horizon) while presenting, else null. */
+  vrPitchDeg: number | null;
+  /** Immersive vertical pitch clamp [min, max] (deg). */
+  vrPitchLimitDeg: [number, number];
 }
 
 /** Current values of the live-tunable "View Controls" debug panel (§ViewControlsPanel). */
@@ -63,6 +68,10 @@ const CLICK_MOVE_THRESHOLD = 6; // px
 export class VRSceneEngine {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
+  /** Parent of the panorama + hotspots. Held at identity on desktop; in an
+   *  immersive session it is counter-rotated to clamp head pitch (§VR pitch
+   *  lock) without ever touching the headset-driven camera. */
+  private world = new THREE.Group();
   private camera: THREE.PerspectiveCamera;
   /** Carries the camera + controllers as a unit; only its Y offset is ever
    *  touched (eye height, §ViewControlsPanel). Never rotated — the headset's
@@ -89,6 +98,16 @@ export class VRSceneEngine {
    *  rotation is never clamped in an immersive session. */
   private minPitchDeg: number = VERTICAL_LOOK_CONFIG.minPitchDeg;
   private maxPitchDeg: number = VERTICAL_LOOK_CONFIG.maxPitchDeg;
+
+  /** Immersive (WebXR) vertical pitch clamp — applied to the world rig, never
+   *  the headset camera. Yaw is never constrained. See applyVRPitchLock. */
+  private vrMinPitchDeg: number = VR_PITCH_LOCK.minPitchDeg;
+  private vrMaxPitchDeg: number = VR_PITCH_LOCK.maxPitchDeg;
+  /** Last measured headset pitch (deg from horizon) — surfaced in debug. */
+  private vrPitchDeg = 0;
+  private vrTmpQ = new THREE.Quaternion();
+  private vrTmpForward = new THREE.Vector3();
+  private vrTmpAxis = new THREE.Vector3();
 
   /** Active desktop look tween (Recenter, or the gentle pre-travel turn
    *  toward a clicked navigation hotspot) — eased, never a snap. Cancelled
@@ -162,9 +181,14 @@ export class VRSceneEngine {
     this.rig.add(this.camera);
     this.scene.add(this.rig);
 
+    // World rig — parents the panorama + hotspots so the immersive pitch clamp
+    // can counter-rotate the whole environment as one. Identity on desktop.
+    this.world.name = 'world-rig';
+    this.scene.add(this.world);
+
     // --- Managers ---
     this.hotspots = new HotspotManager(this.textures, (h) => this.resolveHotspotLabel(h));
-    this.scene.add(this.hotspots.group);
+    this.world.add(this.hotspots.group);
 
     this.panel = new ProductPanel3D(this.textures);
     this.scene.add(this.panel.group);
@@ -172,10 +196,10 @@ export class VRSceneEngine {
     this.scene.add(this.viewControlsPanel3D.group);
 
     this.debugGizmos.visible = false;
-    this.scene.add(this.debugGizmos);
+    this.world.add(this.debugGizmos);
 
     this.sceneManager = new SceneManager(
-      this.scene,
+      this.world,
       this.camera,
       this.textures,
       this.hotspots,
@@ -479,6 +503,8 @@ export class VRSceneEngine {
       this.cb.onVRSessionChange?.(false);
       this.cb.onEvent?.('vr_exited');
       this.viewControlsPanel3D.hide();
+      // Drop any residual pitch-clamp rotation so desktop view is upright.
+      this.world.quaternion.identity();
     });
   }
 
@@ -499,6 +525,8 @@ export class VRSceneEngine {
       loadedTextures: this.textures.loadedSceneIds(),
       hotspotIds: scene?.hotspots.map((h) => h.id) ?? [],
       hovered: this.hotspots.hoveredHotspot()?.id ?? null,
+      vrPitchDeg: this.renderer.xr.isPresenting ? round(this.vrPitchDeg) : null,
+      vrPitchLimitDeg: [this.vrMinPitchDeg, this.vrMaxPitchDeg],
     };
   }
 
@@ -512,6 +540,10 @@ export class VRSceneEngine {
     this.hotspots.update(this.elapsed);
 
     if (this.renderer.xr.isPresenting) {
+      // Clamp head pitch by counter-rotating the world — after this frame's
+      // headset pose is available (three updates the XR camera before this
+      // callback) and before render(). Never touches the camera pose.
+      this.applyVRPitchLock();
       this.updateControllerHover();
     } else {
       if (!this.dragging) this.updateLookTween(dt);
@@ -545,6 +577,47 @@ export class VRSceneEngine {
   private applyDesktopLook(): void {
     const euler = new THREE.Euler(this.pitch * DEG2RAD, this.yaw * DEG2RAD, 0, 'YXZ');
     this.camera.quaternion.setFromEuler(euler);
+  }
+
+  /**
+   * Immersive (WebXR) vertical pitch lock. The headset owns the camera pose and
+   * must never be fought, so instead of rotating the camera we counter-rotate
+   * the *world* (panorama + hotspots): when the head pitches past the limit, the
+   * environment is rotated back by exactly the excess, about the head's own
+   * (horizontal) right axis. Effect: looking down/up stops smoothly at
+   * ±limit, while yaw — and all natural head movement — is untouched.
+   *
+   *   worldRot = axisAngle(headRight, pitch − clamp(pitch, min, max))
+   *
+   * Within the limits the excess is 0 → the rig sits at identity, so there is
+   * no jitter, no snapping and no effect on desktop, controllers or hotspot
+   * hit-testing (hotspots ride the same rig, staying visually and ray-aligned).
+   */
+  private applyVRPitchLock(): void {
+    const xrCam = this.renderer.xr.getCamera();
+    xrCam.getWorldQuaternion(this.vrTmpQ);
+
+    // Head pitch = angle of the forward (−Z) vector above the horizon.
+    this.vrTmpForward.set(0, 0, -1).applyQuaternion(this.vrTmpQ);
+    const pitch = Math.asin(THREE.MathUtils.clamp(this.vrTmpForward.y, -1, 1));
+    this.vrPitchDeg = pitch / DEG2RAD;
+
+    const min = this.vrMinPitchDeg * DEG2RAD;
+    const max = this.vrMaxPitchDeg * DEG2RAD;
+    const excess = pitch - THREE.MathUtils.clamp(pitch, min, max);
+
+    if (Math.abs(excess) < 1e-4) {
+      this.world.quaternion.identity();
+      return;
+    }
+
+    // Rotate the world about the head's right axis, flattened to horizontal so
+    // the correction only affects pitch (never introduces roll / horizon tilt).
+    this.vrTmpAxis.set(1, 0, 0).applyQuaternion(this.vrTmpQ);
+    this.vrTmpAxis.y = 0;
+    if (this.vrTmpAxis.lengthSq() < 1e-6) this.vrTmpAxis.set(1, 0, 0);
+    this.vrTmpAxis.normalize();
+    this.world.quaternion.setFromAxisAngle(this.vrTmpAxis, excess);
   }
 
   private applyInitialCamera(o: CameraOrientation): void {
