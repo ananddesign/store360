@@ -7,6 +7,7 @@ import { HotspotManager } from './hotspotManager';
 import { SceneManager } from './sceneManager';
 import { ProductPanel3D, type PanelAction } from './productPanel';
 import { ViewControlsPanel3D, type ViewControlAction } from './viewControlsPanel3D';
+import { NadirBlur } from './nadirBlur';
 import {
   VR_CONFIG,
   DEG2RAD,
@@ -120,7 +121,10 @@ export class VRSceneEngine {
   private vrPitchDeg = 0;
   private vrTmpQ = new THREE.Quaternion();
   private vrTmpForward = new THREE.Vector3();
-  private vrTmpAxis = new THREE.Vector3();
+
+  /** World-fixed soft blur over the floor past the downward limit — replaces
+   *  the old world counter-rotation so the environment never slides in VR. */
+  private nadirBlur = new NadirBlur(VR_CONFIG.panoramaRadius, VR_PITCH_LOCK.minPitchDeg);
 
   /** Active desktop look tween (Recenter, or the gentle pre-travel turn
    *  toward a clicked navigation hotspot) — eased, never a snap. Cancelled
@@ -217,6 +221,9 @@ export class VRSceneEngine {
     this.debugGizmos.visible = false;
     this.world.add(this.debugGizmos);
 
+    // Nadir blur cap rides the world rig (world-fixed floor blur).
+    this.world.add(this.nadirBlur.mesh);
+
     this.sceneManager = new SceneManager(
       this.world,
       this.camera,
@@ -226,6 +233,7 @@ export class VRSceneEngine {
         onSceneViewed: (s) => {
           this.cb.onSceneChange?.(s);
           this.cb.onEvent?.('scene_viewed', { sceneId: s.id });
+          this.nadirBlur.setTexture(this.sceneManager.currentTexture);
           if (this.debug) this.rebuildDebugGizmos(s);
           if (this.editMode) this.emitEditable();
         },
@@ -266,6 +274,7 @@ export class VRSceneEngine {
     this.hotspots.dispose();
     this.panel.dispose();
     this.viewControlsPanel3D.dispose();
+    this.nadirBlur.dispose();
     this.textures.disposeAll();
     this.clearDebugGizmos();
     this.renderer.dispose();
@@ -501,6 +510,7 @@ export class VRSceneEngine {
   setPanoramaRadius(units: number): void {
     this.panoramaRadiusUnits = units;
     this.sceneManager.setRadius(units);
+    this.nadirBlur.setRadius(units);
   }
 
   /**
@@ -591,11 +601,15 @@ export class VRSceneEngine {
     await this.renderer.xr.setSession(session);
     this.cb.onVRSessionChange?.(true);
     this.cb.onEvent?.('vr_entered');
+    // Floor blur only matters in VR (desktop hard-clamps above the limit).
+    this.nadirBlur.setTexture(this.sceneManager.currentTexture);
+    this.nadirBlur.setVisible(true);
     if (this.debug) this.showViewControlsPanel3D();
     session.addEventListener('end', () => {
       this.cb.onVRSessionChange?.(false);
       this.cb.onEvent?.('vr_exited');
       this.viewControlsPanel3D.hide();
+      this.nadirBlur.setVisible(false);
       // Drop any residual pitch-clamp rotation so desktop view is upright.
       this.world.quaternion.identity();
     });
@@ -673,56 +687,26 @@ export class VRSceneEngine {
   }
 
   /**
-   * Immersive (WebXR) vertical pitch lock. The headset owns the camera pose and
-   * must never be fought, so instead of rotating the camera we counter-rotate
-   * the *world* (panorama + hotspots): when the head pitches past the limit, the
-   * environment is rotated back by exactly the excess, about the head's own
-   * (horizontal) right axis. Effect: looking down/up stops smoothly at
-   * ±limit, while yaw — and all natural head movement — is untouched.
+   * Immersive (WebXR) floor treatment. The headset owns the camera pose and a
+   * real head can't be "stopped" from tilting down — the earlier approach
+   * counter-rotated the whole world past the limit, which made the entire
+   * panorama slide with the head (the "image moves with me" discomfort).
    *
-   *   worldRot = axisAngle(headRight, pitch − clamp(pitch, min, max))
-   *
-   * Within the limits the excess is 0 → the rig sits at identity, so there is
-   * no jitter, no snapping and no effect on desktop, controllers or hotspot
-   * hit-testing (hotspots ride the same rig, staying visually and ray-aligned).
+   * Instead the world is left perfectly still and the floor past the downward
+   * limit is softly *blurred* (never darkened) by a world-fixed cap
+   * (see NadirBlur). This method only measures head pitch for the debug HUD;
+   * the blur itself is geometric (the cap covers the sub-limit region) so no
+   * per-frame update is needed. The world rig is held at identity so nothing
+   * ever slides.
    */
   private applyVRPitchLock(): void {
+    this.world.quaternion.identity();
+
     const xrCam = this.renderer.xr.getCamera();
     xrCam.getWorldQuaternion(this.vrTmpQ);
-
-    // Head pitch = angle of the forward (−Z) vector above the horizon.
     this.vrTmpForward.set(0, 0, -1).applyQuaternion(this.vrTmpQ);
     const pitch = Math.asin(THREE.MathUtils.clamp(this.vrTmpForward.y, -1, 1));
     this.vrPitchDeg = pitch / DEG2RAD;
-
-    // Tighten the gaze limits by the headset's half-FOV so the *visible frame
-    // edge* — not just the gaze centre — respects the limit. Without this a
-    // ±55° gaze clamp still shows the floor at the bottom of a ~90° FOV frame
-    // (you'd see your feet). Half-FOV is read from the XR projection matrix:
-    //   e[5] = 2n/(t−b),  e[9] = (t+b)/(t−b)  →  halfDown = atan((1−e[9])/e[5]).
-    // Only the downward (floor) edge is compensated — the up limit stays the
-    // plain gaze cap (matching desktop), so looking up never feels over-locked.
-    const p = xrCam.projectionMatrix.elements;
-    const a = p[5];
-    const halfDown = a > 1e-4 ? Math.atan((1 - p[9]) / a) : Math.PI / 4;
-
-    const min = this.vrMinPitchDeg * DEG2RAD + halfDown;
-    const max = this.vrMaxPitchDeg * DEG2RAD;
-    const lo = Math.min(min, max);
-    const excess = pitch - THREE.MathUtils.clamp(pitch, lo, max);
-
-    if (Math.abs(excess) < 1e-4) {
-      this.world.quaternion.identity();
-      return;
-    }
-
-    // Rotate the world about the head's right axis, flattened to horizontal so
-    // the correction only affects pitch (never introduces roll / horizon tilt).
-    this.vrTmpAxis.set(1, 0, 0).applyQuaternion(this.vrTmpQ);
-    this.vrTmpAxis.y = 0;
-    if (this.vrTmpAxis.lengthSq() < 1e-6) this.vrTmpAxis.set(1, 0, 0);
-    this.vrTmpAxis.normalize();
-    this.world.quaternion.setFromAxisAngle(this.vrTmpAxis, excess);
   }
 
   private applyInitialCamera(o: CameraOrientation): void {

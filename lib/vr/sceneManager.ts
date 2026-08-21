@@ -73,6 +73,11 @@ export class SceneManager {
     return this.current;
   }
 
+  /** The panorama texture currently mapped on the sphere (for the nadir blur). */
+  get currentTexture(): THREE.Texture | null {
+    return (this.panorama.material as THREE.MeshBasicMaterial).map;
+  }
+
   get previousScene(): VRScene | null {
     return this.previous;
   }
