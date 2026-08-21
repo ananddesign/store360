@@ -59,10 +59,15 @@ export class NadirBlur {
         fadeEndY: { value: Math.sin(limitDeg * DEG2RAD) },
         // How far the blurred floor is lifted toward white (0 = raw floor,
         // 1 = pure white). Keeps the treatment a soft, bright frost rather
-        // than a muddy grey smear.
+        // than a muddy grey smear. This is the *edge* whiteness; it ramps to a
+        // solid pure white toward the nadir (see coreStartY).
         whiteness: { value: 0.78 },
-        // Peak opacity of the frost at the nadir.
+        // Peak opacity of the frost at the fade edge.
         maxAlpha: { value: 0.9 },
+        // Below this elevation the frost concentrates into a solid, pure-white
+        // disc directly under the viewer (the "bottom-centre") so the tripod /
+        // nadir point at straight-down is fully hidden. ~10° below the limit.
+        coreStartY: { value: Math.sin((limitDeg - 10) * DEG2RAD) },
       },
       transparent: true,
       depthTest: false,
@@ -85,6 +90,7 @@ export class NadirBlur {
         uniform float fadeEndY;
         uniform float whiteness;
         uniform float maxAlpha;
+        uniform float coreStartY;
         varying vec3 vDir;
 
         const float PI = 3.141592653589793;
@@ -116,12 +122,17 @@ export class NadirBlur {
           }
           vec3 blurred = sum / wsum;
 
-          // Lift toward white so the floor reads as a soft, bright frost rather
-          // than a grey smear.
-          vec3 col = mix(blurred, vec3(1.0), whiteness);
+          // Two overlapping ramps:
+          //  edge — fades the frost in from fadeStartY → fadeEndY (subtle rim).
+          //  core — from coreStartY down to the nadir, concentrating a solid,
+          //         pure-white disc under the viewer so the tripod / nadir
+          //         point is fully hidden at the bottom-centre.
+          float edge = smoothstep(fadeStartY, fadeEndY, d.y);
+          float core = smoothstep(coreStartY, -1.0, d.y);
 
-          // Fade the frost in as the fragment drops from fadeStartY → fadeEndY.
-          float a = smoothstep(fadeStartY, fadeEndY, d.y) * maxAlpha;
+          // Whiter and more opaque toward the nadir; subtle at the rim.
+          vec3 col = mix(blurred, vec3(1.0), mix(whiteness, 1.0, core));
+          float a = mix(edge * maxAlpha, 1.0, core);
           if (a < 0.004) discard;
           gl_FragColor = vec4(col, a);
         }
