@@ -82,8 +82,6 @@ lib/
     hotspotManager.ts   Hotspot markers, labels, hover, raycast
     productPanel.ts     Spatial 3D product panel
     viewControlsPanel3D.ts  In-headset 3D View Controls (tap +/- steppers)
-    nadirBlur.ts        Downward frosted-blur cap (hides tripod/seam nadir)
-    nadirMask.ts        Soft always-on mask hiding the extreme downward view
     textureManager.ts   Panorama load/preload/dispose (§17)
     placeholder.ts      Procedural placeholder panoramas/products/markers
     webxr.ts            WebXR capability detection
@@ -223,14 +221,9 @@ product hotspots. **Squeeze the grip ("pinch") on either controller to jump
 back to the home scene** at any time. There is no forced locomotion —
 you travel only by selecting hotspots or the home gesture (§23).
 
-You can look a full 360° horizontally and freely up. Looking far **down**,
-the extreme nadir (where a tripod/stitching seam usually sits) softly fades
-to a solid QWEEN-void colour — the fade begins ~45° below the horizon and is
-fully opaque by ~55°. This is an overlay, not a rotation limit: the camera
-(and, in VR, your head) is never clamped, so there's no wall to hit and no
-snapping — it works identically on desktop and in the headset. Tunable via
-`NADIR_MASK_CONFIG` in `lib/vr/config.ts` (or `engine.setNadirLimits()` at
-runtime); set both angles past −90° to effectively disable it.
+You can look a full 360° horizontally, up to **+90°** up and down to **−55°**
+below the horizon, where the (desktop) camera smoothly stops so you never reach
+the ugly nadir (tripod/stitching seam). See "Vertical look limits" below.
 
 ## 6. How to add a new 360 scene
 
@@ -319,30 +312,24 @@ replace `getProductById`) — nothing downstream changes.
 The build is a standard `next build` (verified). `outputFileTracingRoot` is
 pinned in `next.config.mjs` for correct tracing.
 
-## Downward-view restriction (nadir blur)
+## Vertical look limits
 
 360° store photos usually have an ugly nadir — a tripod mount or a stitching
-seam straight down. The viewer hides it without a black patch:
+seam straight down. Rather than mask or blur it, the desktop camera's vertical
+rotation is simply **hard-clamped** so you never reach it:
 
-- **Horizontal:** full 360° rotation, always. Untouched.
-- **Downward blur:** from **−45°** below the horizon the environment eases into
-  a soft frosted blur, reaching **fully frosted at −55°**. It's the *same*
-  panorama, blurred (a second sphere sampling the same texture in a shader) —
-  so the floor stays visible, just defocused; no dark spot, vignette, or hard
-  edge. Only the bottom cap runs the blur (a `discard` skips everything above
-  the band), so there's no whole-frame post-processing and no measurable perf
-  cost.
-- **Camera stop (desktop):** drag/keyboard look can't rotate past **−55°**, so
-  you never travel into the fully-frosted region. Upward look keeps its own
-  (larger) limit; yaw is never constrained.
-- **In VR:** head tracking is never clamped (it can't be) — if you physically
-  tilt all the way down, the blur is simply what you see there.
-- **Configurable:** `NADIR_BLUR_CONFIG` in `lib/vr/config.ts` (`fadeStartDeg`,
-  `limitDeg`, `blurRadius`). `limitDeg` drives both the blur's full-frost angle
-  and the desktop camera stop, so they always agree.
-
-Hotspots, the product panel, and the debug UI render above the blur (higher
-`renderOrder`), so they stay crisp over a blurred floor.
+- **Horizontal:** full, unrestricted 360° rotation, always. Yaw is never
+  constrained.
+- **Vertical:** clamped to **−55° (down) … +90° (up)**. Look past an edge and
+  the camera just stops there — `MathUtils.clamp` on every look input, so it's
+  a smooth stop with no snap-back or jitter. Nothing else changes: no blur,
+  fade, overlay, or colour shift; the panorama renders exactly as before.
+- **In VR:** head tracking is never clamped (it can't be, and clamping it would
+  fight the headset) — this limit governs desktop drag/keyboard look.
+- **Configurable:** `VERTICAL_LOOK_CONFIG` in `lib/vr/config.ts`
+  (`minPitchDeg` / `maxPitchDeg`) — the "minPolarAngle / maxPolarAngle
+  equivalent". The debug "Vertical View / Pitch" control can only *tighten*
+  this range symmetrically, never widen it.
 
 ## 10. Known limitations of V1
 

@@ -17,8 +17,10 @@ export const VR_CONFIG = {
   /** Scene fade transition duration (ms) — §16 target 300–700ms. */
   transitionMs: 500,
 
-  /** Pitch clamp for desktop drag-look (deg) to avoid gimbal flip. */
-  maxPitchDeg: 85,
+  /** Symmetric desktop drag-look pitch clamp (deg). Also the initial value of
+   *  the debug "Vertical View / Pitch" limit. Set to the upward hard limit so
+   *  production look reaches straight up (see VERTICAL_LOOK_CONFIG). */
+  maxPitchDeg: 90,
 
   /** Desktop drag-look sensitivity (deg per pixel). */
   dragSensitivity: 0.12,
@@ -91,22 +93,19 @@ export const DEBUG_VIEW_VR_STEPS = {
 } as const;
 
 /**
- * Downward "frosted blur" of the nadir (lib/vr/nadirBlur.ts) — softly
- * defocuses the extreme downward view, where a tripod mount or a stitching
- * seam commonly ruins 360° photography, while keeping the environment visible
- * (no black hole / vignette). Two roles, both configurable here:
- *  - `limitDeg` also caps how far *down* the desktop camera can rotate
- *    (VRSceneEngine clamps pitch to it). Horizontal 360° is never affected,
- *    and upward look keeps its own (larger) limit.
- *  - `fadeStartDeg`..`limitDeg` is the elevation band over which the blur eases
- *    in (subtle at fadeStart → fully frosted at the limit).
+ * Hard vertical look limits (deg from the horizon; the "minPolarAngle /
+ * maxPolarAngle equivalent"). The desktop camera's pitch is clamped to this
+ * range at every look input, so it simply stops — smoothly, no snap — when it
+ * reaches an edge. Horizontal (yaw) is never constrained → full 360°.
+ *
+ * `minPitchDeg` is the downward floor (nadir stop); `maxPitchDeg` the upward
+ * ceiling (zenith). Note the debug "Vertical View / Pitch" control can only
+ * *tighten* this symmetrically, never widen it. (Headset rotation is never
+ * clamped in an immersive session — that would fight head tracking.)
  */
-export const NADIR_BLUR_CONFIG = {
-  /** Elevation (deg, negative = downward) where the blur begins to ease in. */
-  fadeStartDeg: -45,
-  /** Elevation (deg, negative = downward): full blur, and the desktop
-   *  downward-look hard stop. */
-  limitDeg: -55,
-  /** Blur kernel radius in equirectangular UV space (larger = softer). */
-  blurRadius: 0.006,
+export const VERTICAL_LOOK_CONFIG = {
+  /** How far *down* you may look (deg below horizon; negative). */
+  minPitchDeg: -55,
+  /** How far *up* you may look (deg above horizon). */
+  maxPitchDeg: 90,
 } as const;

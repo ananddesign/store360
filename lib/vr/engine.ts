@@ -13,7 +13,7 @@ import {
   DEBUG_VIEW_DEFAULTS,
   DEBUG_VIEW_RANGES,
   DEBUG_VIEW_VR_STEPS,
-  NADIR_BLUR_CONFIG,
+  VERTICAL_LOOK_CONFIG,
 } from './config';
 
 export interface DebugInfo {
@@ -82,12 +82,13 @@ export class VRSceneEngine {
   // Desktop look state.
   private yaw = 0;
   private pitch = 0;
-  /** Hard stop on how far *down* the desktop camera may rotate (deg from the
-   *  horizon). Matches the nadir blur's limit so the camera never travels into
-   *  the fully-frosted region. Upward look is governed by the symmetric
-   *  pitch limit instead. (Headset rotation is never clamped — the blur cap
-   *  covers the nadir there.) */
-  private nadirDownLimitDeg: number = Math.abs(NADIR_BLUR_CONFIG.limitDeg);
+  /** Hard vertical look bounds (deg from horizon) — the "minPolarAngle /
+   *  maxPolarAngle equivalent". Camera pitch is clamped to [min, max] on every
+   *  look input, so it stops smoothly at −55° down / +90° up. Configurable via
+   *  VERTICAL_LOOK_CONFIG. Yaw (horizontal) is never constrained. Headset
+   *  rotation is never clamped in an immersive session. */
+  private minPitchDeg: number = VERTICAL_LOOK_CONFIG.minPitchDeg;
+  private maxPitchDeg: number = VERTICAL_LOOK_CONFIG.maxPitchDeg;
 
   // Live-tunable view settings (debug panel). Defaults mirror VR_CONFIG's
   // production values; setDebug(true) reseeds them from DEBUG_VIEW_DEFAULTS.
@@ -291,14 +292,16 @@ export class VRSceneEngine {
   }
 
   /**
-   * Clamp a desktop pitch (deg): up by the symmetric look limit, down by the
-   * tighter of that limit and the nadir hard stop — so the camera can never
-   * rotate past the fully-frosted downward region (§ downward-view restriction).
-   * Horizontal (yaw) is never touched, so full 360° look is preserved.
+   * Clamp a desktop pitch (deg) to the hard vertical bounds
+   * [minPitchDeg, maxPitchDeg] (−55°..+90° by default). The debug "Vertical
+   * View / Pitch" limit can only tighten these symmetrically, never widen
+   * them. Horizontal (yaw) is never touched → full 360° look is preserved.
+   * MathUtils.clamp gives a smooth stop at the edge (no snap-back / jitter).
    */
   private clampPitch(deg: number): number {
-    const down = -Math.min(this.pitchLimitDeg, this.nadirDownLimitDeg);
-    return THREE.MathUtils.clamp(deg, down, this.pitchLimitDeg);
+    const down = Math.max(this.minPitchDeg, -this.pitchLimitDeg);
+    const up = Math.min(this.maxPitchDeg, this.pitchLimitDeg);
+    return THREE.MathUtils.clamp(deg, down, up);
   }
 
   /** Live-resize the panorama sphere (units) without reloading the scene. */
