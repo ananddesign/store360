@@ -76,13 +76,17 @@ export const floors: Record<string, FloorConfig> = {
       middle2: {
         image: 'groundfloor-middle2.jpg',
         hotspots: [
-          { target: 'entry', position: { x: -4.75, y: -1.5, z: 1.65 } },
-          { target: 'last', position: { x: 0, y: -1.5, z: -3 } },
+          { target: 'entry', position: { x: -4.83, y: -1.5, z: 1.89 } },
+          { target: 'last', position: { x: 4.28, y: -1.5, z: -1.96 } },
         ],
       },
       last: {
         image: 'groundfloor-last.jpg',
-        hotspots: [{ target: 'middle2', position: { x: 0.86, y: -1.5, z: -4.94 } }],
+        hotspots: [
+          { target: 'middle2', position: { x: 0.86, y: -1.5, z: -4.94 } },
+          { target: 'entry', position: { x: -1.79, y: -1.5, z: -8.56 } },
+          { target: 'entry', position: { x: 2.1, y: -1.5, z: 1.11 } },
+        ],
       },
     },
   },
@@ -94,18 +98,21 @@ export const floors: Record<string, FloorConfig> = {
       entry: {
         image: 'firstfloor-entry.jpg',
         initialCamera: { yaw: 0, pitch: 0 },
-        hotspots: [{ target: 'middle', position: { x: 0.48, y: -1.5, z: 2.02 } }],
+        hotspots: [{ target: 'middle', position: { x: 0.46, y: -1.5, z: 3.42 } }],
       },
       middle: {
         image: 'firstfloor-middle.jpg',
         hotspots: [
           { target: 'entry', position: { x: 0.9, y: -1.5, z: 4.79 } },
-          { target: 'last', position: { x: 0, y: -1.5, z: -3 } },
+          { target: 'last', position: { x: -1.11, y: -1.5, z: -3.1 } },
         ],
       },
       last: {
         image: 'firstfloor-last.jpg',
-        hotspots: [{ target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 } }],
+        hotspots: [
+          { target: 'middle', position: { x: -0.33, y: -1.5, z: -2.25 } },
+          { target: 'entry', position: { x: 1.93, y: -1.5, z: 0.33 } },
+        ],
       },
     },
   },

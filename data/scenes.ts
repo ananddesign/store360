@@ -18,8 +18,10 @@ function buildScenes(): VRScene[] {
     if (!floor) continue;
     for (const [nodeId, node] of Object.entries(floor.nodes)) {
       const id = sceneIdFor(floorId, nodeId);
-      const hotspots: NavigationHotspot[] = node.hotspots.map((h) => ({
-        id: `${id}-to-${h.target}`,
+      const hotspots: NavigationHotspot[] = node.hotspots.map((h, i) => ({
+        // Index-suffixed so a node with two pads to the same target still has
+        // unique hotspot ids (React keys, raycast lookup, position overrides).
+        id: `${id}-to-${h.target}-${i}`,
         type: 'navigation',
         label: h.label ?? 'Explore',
         targetSceneId: sceneIdFor(floorId, h.target),
