@@ -83,6 +83,7 @@ export const floors: Record<string, FloorConfig> = {
       },
       last: {
         image: 'groundfloor-last.jpg',
+        initialCamera: { yaw: 109, pitch: 0 },
         hotspots: [
           { target: 'first-entry', position: { x: 2.32, y: -1.5, z: 1.07 }, label: 'GO TO FIRST FLOOR' },
           { target: 'middle2', position: { x: -1.41, y: -1.5, z: -4.12 }, label: 'CENTER VIEW' },
