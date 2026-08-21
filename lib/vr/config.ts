@@ -65,14 +65,18 @@ export const DEG2RAD = Math.PI / 180;
 export const DEBUG_VIEW_DEFAULTS = {
   eyeHeight: 1.6,
   pitchLimitDeg: 55,
-  panoramaRadius: 50,
+  // Match the shipped production radius (VR_CONFIG.panoramaRadius). A small
+  // sphere makes any eye-height offset a large fraction off-centre, which
+  // looms/distorts the scene ("too grand"); on a large sphere it's negligible
+  // and reads natural — same as production.
+  panoramaRadius: 500,
   initialPitchDeg: 0,
 } as const;
 
 export const DEBUG_VIEW_RANGES = {
-  eyeHeight: { min: 1.4, max: 1.9, step: 0.01 },
+  eyeHeight: { min: 1.0, max: 2.6, step: 0.01 },
   pitchLimitDeg: { min: 30, max: 80, step: 1 },
-  panoramaRadius: { min: 20, max: 100, step: 1 },
+  panoramaRadius: { min: 50, max: 800, step: 10 },
   initialPitchDeg: { min: -20, max: 20, step: 1 },
   initialYawDeg: { min: -180, max: 180, step: 1 },
 } as const;
